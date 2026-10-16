@@ -15,7 +15,7 @@ kind: User
 metadata:
   name: carabaestlein
   annotations:
-    github.com/user-id: '34475835'
+    github.com/user-id: MDQ6VXNlcjM0NDc1ODM1
 spec:
   profile:
     displayName: Cara Baestlein
