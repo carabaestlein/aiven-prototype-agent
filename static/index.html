@@ -1,14 +1,60 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Draft & review · LangGraph starter</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#05080f">
+  <title>Agent workspace · Aiven</title>
+  <link rel="preload" href="/static/brand/FunnelDisplay-ExtraBold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/brand/inter-regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
 <body>
-<header><a class="brand" href="/">◈ <span class="brand-copy"><strong>LangGraph starter</strong><small>Draft &amp; review</small></span></a><div class="header-right"><button id="logout" class="quiet" hidden>Sign out</button></div></header>
-<main>
-<section id="login-view" class="login-card" hidden><span class="eyebrow">A WORKFLOW WITH A HUMAN IN THE LOOP</span><h1>A first draft.<br>A second pair of eyes.</h1><p>Create a draft, give feedback, and pick up where you left off.</p><form id="login-form"><label for="password">Demo password</label><input id="password" type="password" autocomplete="current-password" required maxlength="1024"><button type="submit">Open workspace <span>→</span></button></form><p id="login-error" role="alert" class="error"></p><small>This demo uses a shared workspace. Everyone with access can view its saved runs.</small></section>
-<section id="workspace" hidden><div class="intro"><div><span class="eyebrow">YOUR WORKFLOW WORKSPACE</span><h1>Good work takes a second look.</h1><p>Draft it. Review it. Make it yours.</p></div><span id="mode" class="mode"></span></div><div id="notice" role="status" class="notice" hidden></div>
-<div class="layout"><aside><div class="aside-head"><h2>Saved runs</h2><button id="refresh" class="quiet" aria-label="Refresh saved runs">↻</button></div><button id="new-run" class="new-run">+ New draft</button><p class="small">The latest 50 runs, saved between visits.</p><nav id="run-list" aria-label="Saved workflow runs"></nav></aside>
-<article class="canvas"><ol class="steps" aria-label="Workflow steps"><li id="step-request"><b>01</b> Request</li><li id="step-draft"><b>02</b> Draft</li><li id="step-review"><b>03</b> Review</li><li id="step-complete"><b>04</b> Complete</li></ol>
-<section id="create-view"><span class="eyebrow">START SOMETHING</span><h2>What would you like to draft?</h2><p>A short announcement, a customer reply, a project update—give it a clear starting point.</p><form id="create-form"><label for="request">Your request</label><textarea id="request" rows="6" maxlength="4000" required placeholder="Write a short announcement about our new community workshop…"></textarea><div class="form-foot"><span>Up to 4,000 characters</span><button type="submit">Create draft →</button></div></form><div class="hint"><b>Try the whole loop.</b> Request a revision, then approve the result. You can return to a saved run later.</div></section>
-<section id="detail-view" hidden><div class="detail-head"><span id="status" class="status"></span><span id="revision" class="small"></span></div><h2 id="run-title"></h2><p id="run-date" class="small"></p><div id="draft" class="draft"></div><div id="review-area" hidden><h3>Your call.</h3><p>Approve this version, or leave a note for the next draft.</p><form id="review-form"><label for="feedback">What should change?</label><textarea id="feedback" rows="3" maxlength="2000" placeholder="Make it shorter and more welcoming…"></textarea><div class="actions"><button type="submit" class="secondary">Request revision</button><button type="button" id="approve">Approve draft ✓</button></div></form></div><div id="continue-area" hidden><p>This run has unfinished work. Continue from its last saved step.</p><button id="continue">Continue saved run →</button></div><div id="complete-area" class="hint" hidden><b>Approved and saved.</b> This workflow is complete. Approval only marks the draft as finished; nothing is sent or published.</div></section>
-</article></div><footer>Built with LangGraph · State saved in PostgreSQL · Runs continue when you request them</footer></section>
-<p id="loading" class="loading" role="status">Opening your workspace…</p>
-</main></body></html>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="app-header">
+  <div class="header-inner">
+    <a class="brand" href="#/new" aria-label="Aiven agent workspace"><img src="/static/brand/logo-aiven-white.svg" alt="Aiven" width="110" height="37"><span class="brand-divider"></span><span class="brand-name">Agent workspace<span class="preview-label">LAB</span></span></a>
+    <nav id="workspace-nav" class="workspace-nav" aria-label="Workspace" hidden>
+      <a id="nav-new" href="#/new"><span aria-hidden="true">＋</span> New run</a>
+      <a id="nav-runs" href="#/runs">Past runs</a>
+    </nav>
+    <button id="logout" class="quiet signout" hidden>Sign out <span aria-hidden="true">↗</span></button>
+  </div>
+</header>
+<main id="main">
+  <section id="login-view" class="login-layout" hidden>
+    <div class="login-intro"><span class="eyebrow">AIVEN AGENT WORKSPACE</span><h1>AN IDEA.<br>A DRAFT.<br><span class="highlight">YOUR CALL.</span></h1><p>Bring a request. Shape the result.<br>Pick up right where you left off.</p><div class="orbit-art" aria-hidden="true"><span class="orbit-dot"></span><span class="orbit-star">✳</span><span class="orbit-label">HUMAN IN THE LOOP ↗</span></div></div>
+    <div class="login-card"><span class="section-number">01 / GET STARTED</span><h2>Welcome back.</h2><p>Sign in to your shared workspace.</p><form id="login-form"><label for="password">Workspace password</label><input id="password" type="password" autocomplete="current-password" required maxlength="1024"><button type="submit" class="primary full-width">Open workspace <span aria-hidden="true">↗</span></button></form><p id="login-error" role="alert" class="error"></p><p class="shared-note">Everyone with access to this workspace can view its saved runs.</p></div>
+  </section>
+  <section id="workspace" hidden>
+    <div class="workspace-meta"><span class="workspace-label"><span class="small-mark" aria-hidden="true">✳</span> DRAFT &amp; REVIEW</span><span id="mode" class="mode"></span></div>
+    <div id="notice" role="status" aria-live="polite" class="notice" hidden></div>
+    <section id="create-view" class="create-view">
+      <div class="page-heading"><div><span class="eyebrow">FROM IDEA TO FIRST DRAFT</span><h1 id="new-heading" tabindex="-1">START A <span class="highlight">NEW RUN.</span></h1><p>Describe what you need. Review it, refine it, make it yours.</p></div><span class="heading-glyph" aria-hidden="true">↗</span></div>
+      <form id="create-form" class="composer">
+        <div class="field-heading"><label for="request">What would you like to create?</label><span id="request-count" class="character-count">0 / 4,000</span></div>
+        <textarea id="request" rows="7" maxlength="4000" required placeholder="An announcement, a customer reply, a project update…&#10;&#10;Tell the agent what you need, who it’s for, and how it should sound." aria-describedby="request-hint"></textarea>
+        <div class="form-foot"><span id="request-hint" class="small"><span class="saved-dot" aria-hidden="true"></span> You’ll review the draft before it’s finished.</span><button type="submit" class="primary">Create draft <span aria-hidden="true">↗</span></button></div>
+      </form>
+      <div class="prompt-suggestions"><span class="small">A place to start</span><button type="button" class="suggestion" data-prompt="Write a short product announcement for a new feature. Explain what it does, who it helps, and why it matters. Keep the tone clear and friendly.">Product announcement <span aria-hidden="true">↗</span></button><button type="button" class="suggestion" data-prompt="Draft a friendly reply to a customer asking for an update on a feature request. Acknowledge their feedback without promising a delivery date.">Customer reply <span aria-hidden="true">↗</span></button><button type="button" class="suggestion" data-prompt="Draft a concise project update with sections for progress, next steps, and open questions. Use placeholders where specific details are needed.">Project update <span aria-hidden="true">↗</span></button></div>
+      <div class="workflow-guide" aria-label="How it works"><div><span class="guide-index">01</span><div><h2>Give it a starting point</h2><p>A little context goes a long way.</p></div></div><div><span class="guide-index">02</span><div><h2>Make it better</h2><p>Review the draft and request changes.</p></div></div><div><span class="guide-index">03</span><div><h2>Call it done</h2><p>Approve the version you’re happy with.</p></div></div></div>
+    </section>
+    <section id="history-view" class="history-view" hidden>
+      <div class="page-heading"><div><span class="eyebrow">YOUR WORK, READY WHEN YOU ARE</span><h1 id="history-heading" tabindex="-1">PAST <span class="accent-text">RUNS.</span></h1><p>Return to a draft, continue a review, or revisit the finished result.</p></div><a class="button primary" href="#/new">New run <span aria-hidden="true">＋</span></a></div>
+      <div class="history-panel"><div class="history-toolbar"><div class="search-field"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg><label for="run-search" class="sr-only">Search past runs</label><input id="run-search" type="search" placeholder="Search your runs…" autocomplete="off"></div><div class="history-tools"><span id="run-count" class="small"></span><button id="refresh" class="icon-button" aria-label="Refresh past runs" title="Refresh past runs">↻</button></div></div><div class="list-labels" aria-hidden="true"><span>REQUEST</span><span>STARTED</span><span></span></div><nav id="run-list" class="run-list" aria-label="Saved runs"></nav><div id="history-empty" class="empty-state" hidden><span aria-hidden="true">↗</span><h2>No runs yet.</h2><p>Your saved work will appear here.</p><a href="#/new" class="button secondary">Start a new run</a></div></div><p class="history-caption">Showing your latest 50 runs. Each one is saved between visits.</p>
+    </section>
+    <section id="detail-view" class="detail-view" hidden>
+      <a href="#/runs" class="back-link">← All runs</a>
+      <div class="page-heading detail-heading"><div><div class="detail-meta"><span id="status" class="status"></span><span id="revision" class="small"></span></div><h1 id="detail-heading" tabindex="-1">REVIEW YOUR DRAFT.</h1><p id="run-date" class="small"></p></div></div>
+      <ol class="steps" aria-label="Workflow steps"><li id="step-request"><b>01</b> Request</li><li id="step-draft"><b>02</b> Draft</li><li id="step-review"><b>03</b> Review</li><li id="step-complete"><b>04</b> Complete</li></ol>
+      <details class="request-context"><summary>Your original request</summary><p id="detail-request"></p></details>
+      <div class="review-layout"><article class="draft-panel"><div class="draft-toolbar"><h2 id="run-title">Your draft</h2><button id="copy-draft" class="quiet">Copy draft <span aria-hidden="true">⧉</span></button></div><div id="draft" class="draft"></div></article><aside class="review-panel" aria-label="Review actions"><div id="review-area" hidden><span class="eyebrow">YOU’RE IN CONTROL</span><h2>Make the next move.</h2><p>Happy with this draft? Approve it. Have a change in mind? Send it back with a note.</p><form id="review-form"><label for="feedback">Your feedback</label><textarea id="feedback" rows="5" maxlength="2000" placeholder="Make the opening shorter and the tone more welcoming…"></textarea><div class="actions"><button type="submit" class="secondary">Request revision <span aria-hidden="true">↗</span></button><span class="action-divider">or</span><button type="button" id="approve" class="primary">Approve draft <span aria-hidden="true">✓</span></button></div></form></div><div id="continue-area" hidden><span class="eyebrow">READY WHEN YOU ARE</span><h2>Pick it back up.</h2><p>This run has unfinished work. Continue from the last saved step.</p><button id="continue" class="primary full-width">Continue run <span aria-hidden="true">↗</span></button></div><div id="complete-area" hidden><span class="complete-symbol" aria-hidden="true">✓</span><span class="eyebrow">ALL SET</span><h2>Approved.<br>And saved.</h2><p>This draft is finished and ready to use. It stays here whenever you need it.</p><p class="small">Approving marks the work as complete. It doesn’t send or publish it.</p><a class="button secondary full-width" href="#/new">Start another run <span aria-hidden="true">＋</span></a></div></aside></div>
+    </section>
+    <footer><span>Built on Aiven.</span><span>A shared space. A human in the loop.</span></footer>
+  </section>
+  <p id="loading" class="loading" role="status"><span class="loader" aria-hidden="true"></span> Opening your workspace…</p>
+</main>
+</body>
+</html>

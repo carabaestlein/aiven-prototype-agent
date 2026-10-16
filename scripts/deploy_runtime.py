@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Plan (default) or create the dedicated Step 1 stack; never alter older services.
 
-Requires AIVEN_API_TOKEN. Apply also requires MODEL_API_KEY, LANGFUSE_INIT_USER_EMAIL
-and S3_BUCKET/REGION/ENDPOINT/ACCESS_KEY_ID/SECRET_ACCESS_KEY. Keep --state outside
-the repository: it contains stable passwords and is written with mode 0600.
+Requires AIVEN_API_TOKEN. A new stack also requires MODEL_API_KEY,
+LANGFUSE_INIT_USER_EMAIL and S3_BUCKET/REGION/ENDPOINT/ACCESS_KEY_ID/SECRET_ACCESS_KEY.
+Agent-only updates use existing state credentials. Keep --state outside the
+repository: it contains stable passwords and is written with mode 0600.
 """
 import argparse
 import base64
@@ -267,7 +268,7 @@ class Deployer:
                 require(state and current.get('tags', {}).get('prototype_step1') == state['owner'],
                         'A target name already exists without this deployment ownership tag; no changes made.')
 
-    def ensure_service(self, name, kind, plan, config, state, integrations=None):
+    def ensure_service(self, name, kind, plan, config, state, integrations=None, existing_only=False):
         current = self.service(name, missing=True)
         if current:
             require(current.get('tags', {}).get('prototype_step1') == state['owner'], 'Existing service ownership does not match private state.')
@@ -276,15 +277,17 @@ class Deployer:
             if current.get('state') == 'POWEROFF':
                 self.call('PUT', f'/project/{PROJECT}/service/{name}', {'powered': True})
             return current
+        require(not existing_only, 'Agent-only deployment requires the existing owned agent; no service was created.')
         body = {'service_name': name, 'service_type': kind, 'plan': plan, 'cloud': CLOUD,
                 'tags': {'prototype_step1': state['owner']}, 'user_config': config}
         if integrations:
             body['service_integrations'] = integrations
         return self.call('POST', f'/project/{PROJECT}/service', body)['service']
 
-    def app(self, name, values, state):
+    def app(self, name, values, state, existing_only=False, force_redeploy=False):
         plan, dockerfile = APPS[name]
-        source = {'repository_url': REPOSITORY, 'branch': state['branch'],
+        release = state.get('agent_source', state) if name == 'prototype-agent' else state
+        source = {'repository_url': REPOSITORY, 'branch': release['branch'],
                   'build_path': './', 'containerfile_path': './' + dockerfile}
         settings = {'source': source, 'ports': [] if name.endswith('worker') else
                     [{'name': 'http', 'port': 8080, 'protocol': 'HTTP'}],
@@ -295,7 +298,8 @@ class Deployer:
         for service, kind, variable in mappings:
             integrations.append({'integration_type': 'application_service_credential', 'source_service': service,
                 'user_config': {'service_type': kind, 'exposed_values': {'connection_string': {'environment_variable_key': variable}}}})
-        current = self.ensure_service(name, 'application', plan, {'application': settings}, state, integrations)
+        current = self.ensure_service(name, 'application', plan, {'application': settings}, state,
+                                      integrations, existing_only=existing_only)
         # Only owned fresh applications are reconciled; full env is deterministic
         # from the same private state, so stable credentials survive every retry.
         existing = current.get('user_config', {}).get('application', {})
@@ -303,8 +307,8 @@ class Deployer:
         source_changed = any(existing.get('source', {}).get(key) != value for key, value in source.items())
         if source_changed or any(old_env.get(key) != value for key, value in values.items()) or existing.get('ports') != settings['ports']:
             self.call('PUT', f'/project/{PROJECT}/service/{name}', {'user_config': {'application': settings}})
-            if source_changed:
-                self.call('POST', f'/project/{PROJECT}/service/{name}/application/redeploy')
+        if source_changed or force_redeploy:
+            self.call('POST', f'/project/{PROJECT}/service/{name}/application/redeploy')
         return current
 
 
@@ -323,6 +327,54 @@ def clickhouse_settings(service):
     return {'CLICKHOUSE_URL': endpoint(('clickhouse_https',), 'https'),
             'CLICKHOUSE_MIGRATION_URL': endpoint(('clickhouse', 'clickhouse_native'), 'clickhouse'),
             'CLICKHOUSE_USER': user, 'CLICKHOUSE_PASSWORD': password, 'CLICKHOUSE_DB': 'langfuse'}
+
+
+def agent_environment(state, ca):
+    private = state['values']
+    agent = {key: private[key] for key in ('APP_PASSWORD', 'APP_API_KEY', 'SESSION_SECRET', 'MODEL_API_KEY')}
+    agent.update(PG_CA_CERT_BASE64=ca, MODEL_MODE='openai-compatible', MODEL_BASE_URL='https://ai.aiven.io/v1',
+        MODEL_NAME='claude-sonnet-5', LANGFUSE_BASE_URL=state['langfuse_url'],
+        LANGFUSE_PUBLIC_KEY=private['LANGFUSE_INIT_PROJECT_PUBLIC_KEY'],
+        LANGFUSE_SECRET_KEY=private['LANGFUSE_INIT_PROJECT_SECRET_KEY'], TRACE_CONTENT='false',
+        APP_ENVIRONMENT=PROJECT, APP_RELEASE=state.get('agent_source', state)['release'],
+        LANGSMITH_TRACING='false', LANGCHAIN_TRACING_V2='false')
+    return agent
+
+
+def preflight_agent(deployer, state):
+    require(state and state.get('langfuse_url'), 'Agent-only deployment requires an existing private deployment state with Langfuse configured.')
+    origin(state['langfuse_url'])
+    required = ('APP_PASSWORD', 'APP_API_KEY', 'SESSION_SECRET', 'MODEL_API_KEY',
+                'LANGFUSE_INIT_PROJECT_PUBLIC_KEY', 'LANGFUSE_INIT_PROJECT_SECRET_KEY')
+    require(all(state.get('values', {}).get(key) for key in required),
+            'Private deployment state is missing required agent credentials.')
+    current = deployer.service('prototype-agent', missing=True)
+    require(current, 'Agent-only deployment requires the existing owned agent; no service was created.')
+    require(current.get('tags', {}).get('prototype_step1') == state['owner'],
+            'Existing service ownership does not match private state.')
+    require(current.get('service_type') == 'application' and current.get('cloud_name') == CLOUD
+            and current.get('plan') == APPS['prototype-agent'][0],
+            'Existing agent configuration differs from this deployment.')
+
+
+def apply_agent(deployer, state, path, branch, release):
+    preflight_agent(deployer, state)
+    certificate = deployer.call('GET', f'/project/{PROJECT}/kms/ca')['certificate']
+    ca = base64.b64encode(certificate.encode()).decode()
+    # Save the intended source before mutation so an interrupted deployment can
+    # resume without rotating credentials or silently reverting on full apply.
+    state['agent_source'] = {'branch': branch, 'release': release}
+    state['agent_update'] = 'requested'
+    save_state(path, state)
+    deployer.app('prototype-agent', agent_environment(state, ca), state,
+                 existing_only=True, force_redeploy=True)
+    deployer.wait_services(['prototype-agent'])
+    state['app_url'] = deployer.wait_origin('prototype-agent')
+    deployer.wait_health(state['app_url'] + '/health/ready')
+    state['agent_update'] = 'health_ready'
+    save_state(path, state)
+    return {'status': 'agent_health_ready', 'app_url': state['app_url'],
+            'agent_source': state['agent_source'], 'build_commit_verification': 'pending'}
 
 
 def apply(deployer, state, path, data_only=False):
@@ -360,13 +412,7 @@ def apply(deployer, state, path, data_only=False):
                                       private['LANGFUSE_INIT_PROJECT_SECRET_KEY'])
     deployer.app('prototype-langfuse-worker', dict(shared, LANGFUSE_BACKGROUND_MIGRATION_V4_ENABLE_HISTORIC_BACKFILL='false'), state)
     deployer.wait_services(['prototype-langfuse-worker'])
-    agent = {key: private[key] for key in ('APP_PASSWORD', 'APP_API_KEY', 'SESSION_SECRET', 'MODEL_API_KEY')}
-    agent.update(PG_CA_CERT_BASE64=ca, MODEL_MODE='openai-compatible', MODEL_BASE_URL='https://ai.aiven.io/v1',
-        MODEL_NAME='claude-sonnet-5', LANGFUSE_BASE_URL=state['langfuse_url'],
-        LANGFUSE_PUBLIC_KEY=private['LANGFUSE_INIT_PROJECT_PUBLIC_KEY'],
-        LANGFUSE_SECRET_KEY=private['LANGFUSE_INIT_PROJECT_SECRET_KEY'], TRACE_CONTENT='false',
-        APP_ENVIRONMENT=PROJECT, APP_RELEASE=state['release'], LANGSMITH_TRACING='false', LANGCHAIN_TRACING_V2='false')
-    deployer.app('prototype-agent', agent, state)
+    deployer.app('prototype-agent', agent_environment(state, ca), state)
     deployer.wait_services(['prototype-agent'])
     state['app_url'] = deployer.wait_origin('prototype-agent')
     deployer.wait_health(state['app_url'] + '/health/ready')
@@ -380,6 +426,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--apply', action='store_true', help='Create/reconcile only the dedicated tagged new stack.')
     parser.add_argument('--data-only', action='store_true', help='Create and wait for the four data services; do not build applications yet.')
+    parser.add_argument('--agent-only', action='store_true', help='Update only the existing owned agent to --branch/--release; preserve all data and Langfuse services.')
     parser.add_argument('--state', type=Path, help='Private state file outside the repository; required for apply.')
     parser.add_argument('--branch', default='main')
     parser.add_argument('--release', required=True, help='Full Git commit SHA, recorded in app telemetry.')
@@ -388,18 +435,28 @@ def main(argv=None):
     try:
         require(re.fullmatch(r'[0-9a-f]{40}', args.release) and re.fullmatch(r'[a-zA-Z0-9_./-]+', args.branch), 'Supply a valid full release SHA and branch.')
         require(0 < args.timeout <= 7200, 'Timeout must be between 0 and 7200 seconds.')
+        require(not (args.agent_only and args.data_only), '--agent-only cannot be combined with --data-only.')
         require(os.environ.get('AIVEN_API_TOKEN'), 'Set AIVEN_API_TOKEN in the environment.')
         if args.apply:
             require(args.state is not None, '--apply requires --state outside the repository.')
         if args.state:
             require(not args.state.resolve().is_relative_to(Path(__file__).resolve().parents[1]), 'Private deployment state must be outside the repository.')
         state = load_state(args.state)
-        if state:
+        if state and not args.agent_only:
             require(state['branch'] == args.branch and state['release'] == args.release, 'Use the original branch/release when resuming this state.')
         options = dict(follow_redirects=False, trust_env=False, verify=True)
         with httpx.Client(headers={'Authorization': 'Bearer ' + os.environ['AIVEN_API_TOKEN']}, **options) as api:
             with httpx.Client(**options) as public:
                 deployer = Deployer(api, public, args.timeout)
+                if args.agent_only:
+                    preflight_agent(deployer, state)
+                    if args.apply:
+                        result = apply_agent(deployer, state, args.state, args.branch, args.release)
+                    else:
+                        result = {'status': 'plan', 'services': ['prototype-agent'], 'creates_resources': False,
+                                  'agent_source': {'branch': args.branch, 'release': args.release}}
+                    print(json.dumps(result))
+                    return 0
                 deployer.preflight(state)
                 if not args.apply:
                     print(json.dumps({'status': 'plan', 'project': PROJECT, 'cloud': CLOUD,

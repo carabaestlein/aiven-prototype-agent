@@ -150,6 +150,7 @@ def test_full_flow_waits_for_web_before_worker_and_shares_stable_configuration(t
     inputs = {key: 'private-test-value' for key in deploy.INPUTS}
     inputs['S3_ENDPOINT'] = 'https://storage.example.test'
     private = deploy.new_state(Namespace(branch='main', release='a' * 40), inputs)
+    private['agent_source'] = {'branch': 'release/ui-refresh', 'release': 'b' * 40}
 
     class Stub:
         def ensure_service(self, name, *args):
@@ -189,6 +190,7 @@ def test_full_flow_waits_for_web_before_worker_and_shares_stable_configuration(t
         assert apps['prototype-langfuse-web'][key] == apps['prototype-langfuse-worker'][key]
     assert apps['prototype-agent']['LANGFUSE_SECRET_KEY'] == private['values']['LANGFUSE_INIT_PROJECT_SECRET_KEY']
     assert apps['prototype-agent']['APP_API_KEY'] == private['values']['APP_API_KEY']
+    assert apps['prototype-agent']['APP_RELEASE'] == 'b' * 40
     assert result['status'] == 'ready' and 'private' not in json.dumps(result)
 
 
@@ -293,3 +295,93 @@ def test_langfuse_initialization_rejects_redirect_without_forwarding_project_key
             deploy.Deployer(client, client).wait_langfuse_initialized('https://langfuse.example.test', 'public', 'secret')
     assert len(requests) == 2 and all(r.url.host == 'langfuse.example.test' for r in requests)
     assert 'secret-response' not in str(caught.value)
+
+
+def agent_state():
+    inputs = {key: 'private-test-value' for key in deploy.INPUTS}
+    inputs['S3_ENDPOINT'] = 'https://storage.example.test'
+    private = deploy.new_state(Namespace(branch='release/step1', release='a' * 40), inputs)
+    private['langfuse_url'] = 'https://langfuse.example.test'
+    return private
+
+
+def test_agent_only_rebuild_preserves_secrets_and_never_mutates_dependencies(tmp_path):
+    private, requests = agent_state(), []
+    initial_values = dict(private['values'])
+    service = {'tags': {'prototype_step1': private['owner']}, 'service_type': 'application',
+               'cloud_name': deploy.CLOUD, 'plan': deploy.APPS['prototype-agent'][0], 'state': 'RUNNING',
+               'service_uri': 'https://agent.example.test', 'user_config': {'application': {
+                   'source': {'branch': 'release/step1'},
+                   'environment_variables': [{'key': key, 'value': '<redacted>'} for key in initial_values]}}}
+
+    def respond(request):
+        body = json.loads(request.content) if request.content else None
+        requests.append((request.method, request.url.path, body))
+        if request.url.path.endswith('/kms/ca'):
+            return httpx.Response(200, json={'certificate': 'test-ca'})
+        if request.url.path == '/health/ready':
+            return httpx.Response(200)
+        if request.method == 'PUT':
+            service['user_config'] = body['user_config']
+        if request.method == 'POST':
+            assert request.url.path.endswith('/prototype-agent/application/redeploy')
+            return httpx.Response(204)
+        return httpx.Response(200, json={'service': service})
+
+    path = tmp_path / 'private.json'
+    with httpx.Client(transport=httpx.MockTransport(respond)) as client:
+        runner = deploy.Deployer(client, client)
+        result = deploy.apply_agent(runner, private, path, 'release/ui-refresh', 'b' * 40)
+        # Explicit retries rebuild even when the selected branch has not changed.
+        deploy.apply_agent(runner, deploy.load_state(path), path, 'release/ui-refresh', 'b' * 40)
+    mutations = [(method, url, body) for method, url, body in requests if method != 'GET']
+    assert all('/service/prototype-agent' in url for _, url, _ in mutations)
+    assert len([1 for method, _, _ in mutations if method == 'POST']) == 2
+    app = next(body['user_config']['application'] for method, _, body in mutations if method == 'PUT')
+    env = {entry['key']: entry['value'] for entry in app['environment_variables']}
+    assert app['source']['branch'] == 'release/ui-refresh'
+    assert env['APP_RELEASE'] == 'b' * 40
+    for key in ('APP_PASSWORD', 'APP_API_KEY', 'SESSION_SECRET', 'MODEL_API_KEY'):
+        assert env[key] == initial_values[key]
+    assert env['LANGFUSE_SECRET_KEY'] == initial_values['LANGFUSE_INIT_PROJECT_SECRET_KEY']
+    assert '<redacted>' not in env.values() and 'DATABASE_URL' not in env
+    saved = deploy.load_state(path)
+    assert saved['values'] == initial_values
+    assert saved['branch'] == 'release/step1' and saved['release'] == 'a' * 40
+    assert saved['agent_source'] == {'branch': 'release/ui-refresh', 'release': 'b' * 40}
+    assert result['build_commit_verification'] == 'pending'
+
+
+@pytest.mark.parametrize('existing', [None, {'tags': {'prototype_step1': 'someone-else'}}])
+def test_agent_only_missing_or_unowned_service_never_writes_state_or_creates_resources(tmp_path, existing):
+    requests = []
+    def respond(request):
+        requests.append(request.method)
+        return httpx.Response(404) if existing is None else httpx.Response(200, json={'service': existing})
+    path = tmp_path / 'private.json'
+    with httpx.Client(transport=httpx.MockTransport(respond)) as client:
+        with pytest.raises(deploy.DeploymentError):
+            deploy.apply_agent(deploy.Deployer(client, client), agent_state(), path, 'release/ui-refresh', 'b' * 40)
+    assert requests == ['GET'] and not path.exists()
+
+
+def test_agent_only_plan_accepts_new_release_and_does_not_write(monkeypatch, tmp_path, capsys):
+    private, requests = agent_state(), []
+    path = tmp_path / 'private.json'
+    deploy.save_state(path, private)
+    def respond(request):
+        requests.append(request)
+        return httpx.Response(200, json={'service': {
+            'tags': {'prototype_step1': private['owner']}, 'service_type': 'application',
+            'cloud_name': deploy.CLOUD, 'plan': deploy.APPS['prototype-agent'][0]}})
+    original_client = httpx.Client
+    monkeypatch.setattr(deploy.httpx, 'Client', lambda **kwargs: original_client(
+        transport=httpx.MockTransport(respond), **kwargs))
+    monkeypatch.setenv('AIVEN_API_TOKEN', 'private-test-token')
+    assert deploy.main(['--agent-only', '--state', str(path), '--branch', 'release/ui-refresh',
+                        '--release', 'b' * 40]) == 0
+    assert len(requests) == 1 and requests[0].method == 'GET'
+    assert requests[0].url.path.endswith('/service/prototype-agent')
+    assert deploy.load_state(path) == private
+    output = json.loads(capsys.readouterr().out)
+    assert output['creates_resources'] is False and output['services'] == ['prototype-agent']

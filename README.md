@@ -14,6 +14,8 @@ This repository uses the open-source LangGraph library inside its own Python app
 4. Request a revision with feedback, or approve the draft to finish.
 5. Reopen a saved run later, including after an application restart.
 
+The dark workspace has separate **New run** (`#/new`) and searchable **Past runs** (`#/runs`) screens. Each saved run has its own link for review, revision, approval and copying the result. Unsubmitted requests and feedback survive navigation within the page; saved drafts also survive reloads. The interface follows the current [Aiven branding](static/brand/SOURCES.md), with locally hosted fonts and logo.
+
 **Mock mode is the default.** It produces explicitly labelled, deterministic demo text and makes no model-provider calls. Real mode calls an OpenAI-compatible chat-completions endpoint using your chosen model and private API key. Approving a draft only marks it complete; nothing is sent or published.
 
 ```text

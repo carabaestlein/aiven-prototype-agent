@@ -55,6 +55,18 @@ Use `--data-only` to provision just the four databases first; rerun without that
 
 The helper waits for the active Langfuse login origin and authenticated project-key lookup before starting its worker. Runtime redacts even ordinary environment values on reads, so reconciliation resubmits the complete private configuration and may restart an application. If an unchanged build failed, inspect the logs and explicitly request `POST /project/cara-test/service/<application>/application/redeploy`; merely rerunning the helper does not retry that build.
 
+### Update only the agent application
+
+Publish a new frozen branch and verify its remote SHA first. With `AIVEN_API_TOKEN` loaded privately, use the existing state file and the new branch/full SHA:
+
+```sh
+.venv/bin/python scripts/deploy_runtime.py --agent-only --apply --state ../private-deployment.json --branch release/ui-refresh --release "$AGENT_RELEASE_SHA"
+```
+
+Omit `--apply` for a read-only plan. This path requires the existing owned `prototype-agent`, replaces only its complete application configuration, and explicitly requests a rebuild. It never creates a service or updates Langfuse or databases. The PostgreSQL credential integration remains in place; application and tracing credentials are reconstructed from private state, never copied from redacted API responses. Each explicit retry requests a rebuild.
+
+The state file retains the original stack `branch`/`release` and adds `agent_source` with the new branch/SHA before the update. A later full-stack resume still uses the original command above and honors the stored agent override, so it does not revert the UI. Keep this state file private and back it up. The helper's readiness result does **not** prove the new build is serving: wait for the new build to complete, compare the deployed assets with the release, and check the UI and existing saved runs before declaring the update complete.
+
 ## Acceptance sequence
 
 Export `APP_URL`, `APP_API_KEY`, `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` privately. Never put secret values in command arguments. From the repository root:
