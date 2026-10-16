@@ -1,0 +1,39 @@
+services:
+  langgraph:
+    build: .
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      LOCAL_DEVELOPMENT: "true"
+      DATABASE_URL: postgresql://langgraph:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@langgraph-postgres:5432/langgraph
+      APP_PASSWORD: ${APP_PASSWORD:?Set APP_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET}
+      APP_API_KEY: ${APP_API_KEY:?Set APP_API_KEY}
+      MODEL_MODE: ${MODEL_MODE:-mock}
+      MODEL_NAME: ${MODEL_NAME:-}
+      MODEL_API_KEY: ${MODEL_API_KEY:-}
+      MODEL_BASE_URL: ${MODEL_BASE_URL:-https://ai.aiven.io/v1}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      TRACE_CONTENT: ${TRACE_CONTENT:-false}
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-development}
+      APP_RELEASE: ${APP_RELEASE:-}
+    depends_on:
+      langgraph-postgres:
+        condition: service_healthy
+  langgraph-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: langgraph
+      POSTGRES_DB: langgraph
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langgraph -d langgraph"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  postgres-data:

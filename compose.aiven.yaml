@@ -1,0 +1,19 @@
+services:
+  langgraph:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - langgraph-postgres
+    environment:
+      DATABASE_URL: postgresql://USER:PASSWORD@langgraph-postgres:5432/defaultdb
+      MODEL_MODE: mock
+      MODEL_BASE_URL: https://ai.aiven.io/v1
+      MODEL_NAME: claude-sonnet-5
+      APP_ENVIRONMENT: cara-test
+      TRACE_CONTENT: "false"
+      # Set MODEL_MODE=openai-compatible after adding MODEL_API_KEY as a Runtime secret.
+      # Add APP_PASSWORD, SESSION_SECRET, APP_API_KEY and PG_CA_CERT_BASE64 in Runtime.
+      # Add LANGFUSE_BASE_URL and both project keys from the self-hosted Langfuse project.
+  langgraph-postgres:
+    image: postgres:16
