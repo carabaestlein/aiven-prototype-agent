@@ -1,6 +1,6 @@
 # Aiven developer-experience findings
 
-These are observations from the existing Phase 1 deployment and this Hub integration. The dated source of live resource status is [live-infrastructure-check.json](live-infrastructure-check.json); earlier deployment evidence and limitations remain in [DEPLOYMENT.md](../../DEPLOYMENT.md).
+These are observations from the existing Phase 1 deployment and this Hub integration. Phase 1 resource checks are recorded in [live-infrastructure-check.json](live-infrastructure-check.json), and Hub rollout checks in [VALIDATION.md](VALIDATION.md). Earlier deployment evidence and limitations remain in [DEPLOYMENT.md](../../DEPLOYMENT.md).
 
 | Observed friction | Minimal workaround here | Product opportunity |
 | --- | --- | --- |
@@ -9,6 +9,7 @@ These are observations from the existing Phase 1 deployment and this Hub integra
 | A generic Runtime service URI was not the public HTTPS route. | Preserve the actual public HTTP endpoint in catalog metadata; do not infer it from service names. | Canonical application URL in deployment responses. |
 | Langfuse project keys must be created and delivered separately from database credential integrations. | Parameterized configuration plus an operator workflow for project-key creation and private secret injection. | A first-class tracing integration that provisions scoped keys and keeps them out of generated code. |
 | Environment PUT replaces the complete array; direct API reads returned the literal `<redacted>` for all Hub values, including ordinary variables. | Reconstruct updates from saved private configuration; never copy API readback into a new payload. Preserve credentials entered through the Console. | Per-key patch operations, clear redaction semantics and configuration revisions. |
+| Updating Runtime environment credentials triggered a full image rebuild, including dependency installation; the observed rollout took approximately six minutes. | Batch related secret updates and wait for application readiness after the resulting build. | Apply environment-only changes by restarting the existing image, with an explicit rebuild option. |
 | Runtime redeploy resolves the latest commit on a branch; Phase 1 logs did not expose an independently verified resolved source SHA. | Use a recorded release branch and application release metadata; inspect the completed build. | Immutable source selection and visible resolved commit/image identity. |
 | Git pushes do not automatically deploy Runtime applications. | A developer creates a reviewed change, then explicitly deploys the intended commit through Runtime. | A native, configurable continuous deployment trigger with approval gates. |
 | PostgreSQL checkpointing retains work but does not schedule interrupted work automatically. | Reuse the agent's explicit Continue operation and per-run locking. | Durable execution/recovery controls with observable job state. |
