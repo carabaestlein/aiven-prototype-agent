@@ -12,6 +12,9 @@ backend:
   database:
     client: pg
     pluginDivisionMode: schema
+    # Aiven provisions the database; Backstage manages only its plugin schemas.
+    ensureExists: false
+    ensureSchemaExists: true
     connection:
       host: ${POSTGRES_HOST}
       port: ${POSTGRES_PORT}
