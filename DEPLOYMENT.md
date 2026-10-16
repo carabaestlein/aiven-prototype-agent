@@ -1,6 +1,6 @@
 # Step 1: Aiven deployment
 
-Target project: **cara-test**. Gateway: `https://ai.aiven.io/v1`. Requested model: **claude-sonnet-5**; verify availability with the project's key before deployment. Future HTML/CSS/JS generation and Nevia are out of scope.
+Target project: **cara-test**, fresh deployment in **aws-eu-west-1**. Existing services remain powered off. Gateway: `https://ai.aiven.io/v1`. Requested model: **claude-sonnet-5**; verify availability with the project's key before deployment. Future HTML/CSS/JS generation and Nevia are out of scope.
 
 ## What we reuse
 
@@ -18,7 +18,7 @@ Langfuse's starter already supplies pinned web/worker images, TLS setup, ClickHo
 
 ## Deployment order
 
-1. **Preflight.** Read project services and region; reuse only explicitly selected compatible services. Fetch service types/plans and prices. Choose distinct names such as `prototype-agent`, `prototype-agent-pg`, `prototype-langfuse-web`, `prototype-langfuse-worker`, `prototype-langfuse-pg`, `prototype-langfuse-ch`, `prototype-langfuse-valkey`. Inspect existing resources before creating any. Record region, plans, versions, repository SHA and service IDs.
+1. **Preflight.** Read project services and region; reuse only explicitly selected compatible services. Fetch service types/plans and prices. Choose distinct names such as `prototype-agent`, `prototype-agent-pg`, `prototype-langfuse-web`, `prototype-langfuse-worker`, `prototype-langfuse-pg`, `prototype-langfuse-ch`, `prototype-langfuse-valkey`. This task uses a fresh stack rather than the older demo services. Inspect existing resources before creating any. Record region, plans, versions, repository SHA and service IDs.
 2. **Storage.** Agent: dedicated PostgreSQL database, reference v16, 10-connection pool. Langfuse: separate PostgreSQL v17 database, ClickHouse **26.3** single shard with a pre-created Replicated `langfuse` database, and dedicated persistent Valkey with `noeviction`. Use the existing private R2 bucket with its real S3 endpoint, bucket-scoped S3 credentials, `S3_REGION=auto`, `S3_FORCE_PATH_STYLE=false`.
 3. **Langfuse web.** Build `Dockerfile.langfuse-web` from repository root, one replica, HTTP 8080. Map PostgreSQL and Valkey credential integrations to `DATABASE_URL` and `VALKEY_URL`. Apply `infra/langfuse/.env.runtime.example` settings, preserving shared `SALT` and `ENCRYPTION_KEY`. Set `NEXTAUTH_URL` to the resulting web HTTPS origin. Wait for successful migrations, `/api/public/health`, and login.
 4. **Langfuse worker.** Same repository commit, root `Dockerfile.langfuse-worker`, one replica, **no public ports**. Same databases, bucket, CA, secrets and web `NEXTAUTH_URL`. Start after web migrations. Keep `LANGFUSE_BACKGROUND_MIGRATION_V4_ENABLE_HISTORIC_BACKFILL=false` for this fresh installation. It is not an upgrade strategy for existing v3 data.
@@ -27,13 +27,33 @@ Langfuse's starter already supplies pinned web/worker images, TLS setup, ClickHo
 
 Upstream suggested starting sizes: agent Runtime 1 GiB; Langfuse web/worker 4 GiB each; agent/Langfuse PostgreSQL 4 GiB each; Valkey >=2 GiB; ClickHouse >=8 GiB. These are conservative demo starting points, not tested minimums. Resolve available project plans and costs before provisioning.
 
+The seven selected plans currently total **$0.93680384/hour**, about **$22.48/day**, before model usage, storage extras, discounts or account-specific pricing. See `deployment-evidence.json` for the deployed plans.
+
+## Access
+
+Use `APP_PASSWORD` for the agent's browser login. Langfuse uses `LANGFUSE_INIT_USER_EMAIL` and `LANGFUSE_INIT_USER_PASSWORD`. These are different from API keys. Generated values are in the private deployment state; this task also saved them in the private `.env.secrets` file outside the repository. Never commit either file.
+
 ## Reproducible API approach
 
 Use the [Aiven REST API](https://api.aiven.io/doc/) with a project-authorized token, never a token committed to Git. Discover current service types, plans and `user_config` schemas before constructing requests; provider identifiers must come from API responses. Create data services, databases, applications and credential integrations explicitly. API deployment does not execute Compose.
 
 Keep a sanitized deployment record of resource names, source SHA, cloud, plans, versions, integration mappings and public endpoints. Store secrets privately and inject them as Runtime secrets. Aiven environment-variable updates replace the whole list: preserve existing entries. Do not recreate resources on retry after an ambiguous request; read their state first.
 
-Use a release branch frozen at a recorded SHA; Runtime's normal redeploy builds the selected branch's latest commit. Verify the SHA in build logs. Roll back application code with a tested previous release and compatible database schema; never assume a code rollback reverses migrations. Runtime has no pre-deploy commands/one-off tasks, so keep single-instance startup schema setup for this milestone.
+Use a public repository for this deployment (no GitHub integration is available). Use a release branch frozen at a recorded SHA; Runtime's normal redeploy builds the selected branch's latest commit. Check the remote branch SHA before and after deployment and look for the resolved revision in build logs. This deployment's logs did not expose the resolved source SHA, so the frozen branch and configured release are evidence of intended source, not an independent image attestation. Roll back application code with a tested previous release and compatible database schema; never assume a code rollback reverses migrations. Runtime has no pre-deploy commands/one-off tasks, so keep single-instance startup schema setup for this milestone.
+
+## Fresh-stack API helper
+
+`scripts/deploy_runtime.py` implements the fresh deployment above. It checks live schemas/plans/versions and rejects target names that belong to another deployment. It never changes the older demo services. `--apply` creates billable resources; omitting it only checks the plan.
+
+Load the API token, Gateway key, Langfuse owner email and R2 variables privately into the environment. Keep the state file outside this repository; it contains generated stable passwords, salts and project keys. Example:
+
+```sh
+.venv/bin/python scripts/deploy_runtime.py --apply --state ../private-deployment.json --branch release/step1 --release 35cff71b56d8346be3acdb0364dc71a1c072b295
+```
+
+Use `--data-only` to provision just the four databases first; rerun without that flag to continue. Always retain the same state file, release and branch on retry. The deployment helper does not roll back or delete resources on failure. It reports readiness separately from trace and build-commit verification. Protect `release/step1` from accidental movement; Runtime resolves a branch, not an immutable SHA parameter.
+
+The helper waits for the active Langfuse login origin and authenticated project-key lookup before starting its worker. Runtime redacts even ordinary environment values on reads, so reconciliation resubmits the complete private configuration and may restart an application. If an unchanged build failed, inspect the logs and explicitly request `POST /project/cara-test/service/<application>/application/redeploy`; merely rerunning the helper does not retry that build.
 
 ## Acceptance sequence
 
@@ -47,7 +67,7 @@ mkdir -p receipts
 .venv/bin/python scripts/verify_deployment.py start --receipt receipts/runtime.json --expected-model claude-sonnet-5
 ```
 
-Restart **only the agent application** via Aiven API power off/on, preserving its PostgreSQL service. Record the API lifecycle transition and wait for readiness. Then:
+Restart **only the agent application** via Aiven API power off/on, preserving its PostgreSQL service. Allow shutdown to finish before powering on: immediately reversing the request can coalesce without restarting the process. Record shutdown/startup logs and a changed Runtime process hostname, then wait for readiness. API state alone is insufficient. Then:
 
 ```sh
 .venv/bin/python scripts/verify_deployment.py resume --receipt receipts/runtime.json --expected-model claude-sonnet-5 --restart-confirmed
@@ -70,5 +90,8 @@ Optional local PostgreSQL test (test database only): install `pgserver==0.1.4`, 
 | Checkpointing does not resume work automatically | Durable job execution, cancellation and recovery controls |
 | Environment updates replace the full list; release redeploy follows a branch | Safer secret/config patching and explicit release pinning |
 | Health checks do not prove model access or stored traces | Built-in end-to-end deployment acceptance checks |
+| Runtime's generic `service_uri` was not an HTTPS app URL; the public HTTP component supplied the actual route | Return an explicit canonical application URL in the API |
+| Runtime build logs warn that Dockerfile HEALTHCHECK is ignored for OCI images | Expose and document managed startup/readiness probes |
+| Control-plane state and health can briefly describe an old process; resolved source SHA was absent from logs | Expose deployment generation, active process/release identity and completion signals |
 
 Sources: [Gateway API](https://aiven.io/docs/products/ai-gateway/rest-api), [Runtime Compose](https://aiven.io/docs/products/runtime/manifest-files/compose-files), [Runtime integrations](https://aiven.io/docs/products/runtime/connect-services-to-apps), [restart semantics](https://aiven.io/docs/products/runtime/power-off-apps), [Langfuse compatibility](https://langfuse.com/docs/compatibility), [Langfuse R2](https://langfuse.com/self-hosting/deployment/infrastructure/blobstorage).

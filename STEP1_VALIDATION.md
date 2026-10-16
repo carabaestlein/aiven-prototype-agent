@@ -1,22 +1,22 @@
 # Step 1 validation — 16 October 2026
 
-## Completed in this session
+## Verified
 
-- Inspected both upstream repositories at the commits recorded in UPSTREAM.md.
-- Python 3.12.14: **34 tests passed**, including two actual PostgreSQL 16.2 integration tests. **11 Langfuse starter tests passed** separately from infra/langfuse.
-- Native Langfuse SDK/OTel serialization verified without network: model spans remain children of their run span across LangGraph worker execution; session IDs, actual/requested model and usage are recorded; prompts default off; exporter failures do not repeat model calls.
-- PostgreSQL checkpoints verified after closing/reopening connection pools and rebuilding saver/graph/service, including stale-review rejection and recovery after a failed mocked model request. This is not an abrupt process-kill test.
-- Live Aiven API authentication works for cara-test. Gateway models API confirms claude-sonnet-5 is available. No inference made yet.
-- Found existing powered-off Langfuse web/worker, PostgreSQL 17, ClickHouse 26.3 and persistent noeviction Valkey 8.1; agent PostgreSQL 16 also exists. Existing Langfuse settings include R2 configuration and project keys.
+- **62 agent/deployment tests passed**, including two real PostgreSQL 16.2 integration tests; **11 Langfuse starter tests passed** separately. Offline tests cover trace parentage across LangGraph worker execution, session/model/usage attributes, default prompt exclusion, sanitized errors, and exporter failures without duplicate model calls.
+- Seven fresh services in `cara-test`, `aws-eu-west-1`, were `RUNNING` at the 08:59 check: `prototype-agent`, `prototype-agent-pg`, `prototype-langfuse-web`, `prototype-langfuse-worker`, `prototype-langfuse-pg`, `prototype-langfuse-ch`, and `prototype-langfuse-valkey`. Older services were not reused. All three Runtime builds reported `SUCCESS`.
+- [Agent](https://01a143ee-18f7-7972-aebe-7cd8498afb71-8080.eur-1.aiven.app) password login and [Langfuse](https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app) administrator login/project API keys worked.
+- A live `claude-sonnet-5` Gateway request produced a draft, PostgreSQL checkpoint, and retrievable Langfuse root/generation observations. Parent relationship, run session ID, release label, and **124 total tokens** were verified in the initial trace.
+- The Runtime agent shut down at 09:00:43 and was healthy on a replacement host at 09:01:24 (`run-aceda9e5…` → `run-1ab53af8…`). Its existing checkpoint and draft hash survived. The saved run then reached revision 2 and was approved to completion.
+- Draft and revision traces contain model generations. The completed approval trace contains none during a **90-second observation window**.
+- Langfuse web and worker were restarted with new process identities. Earlier traces remained readable, and a new Gateway run produced a retrievable trace after both restarts. All seven services were confirmed running again; see [deployment-evidence.json](deployment-evidence.json). Times in this report are UTC.
 
-## Pending live acceptance
+## Source evidence
 
-- Activate/redeploy selected Runtime services and confirm build SHA/readiness.
-- Real AI Gateway draft and Langfuse generation ingestion/retrieval.
-- Restart Runtime agent, compare checkpoint/draft, revise and approve.
-- Restart Langfuse web/worker, read old trace and process new trace.
+The public `release/step1` branch was frozen at `35cff71b56d8346be3acdb0364dc71a1c072b295`; GitHub checks before and after deployment confirmed that ref. Runtime was configured to build this branch. Runtime logs did **not** expose a resolved source SHA, so this establishes the intended source and successful builds, not an independent build-to-commit attestation. The agent's release label alone is not such an attestation.
 
-No new services or live app restarts have been performed yet. Docker/container build validation awaits Runtime; no local container engine is installed. The unit suite reports one upstream Starlette/AnyIO deprecation warning.
+## Limits
+
+Checkpoint persistence and explicit continuation are verified. There is no autonomous recovery scheduler: interrupted work requires a continuation request. No abrupt crash during an in-flight model call was tested; checkpointing does not guarantee exactly-once model calls. Load, concurrent replicas, database outages, and backup/restore remain unvalidated. Container builds ran on Runtime; no local container engine is installed. The unit suite reports one upstream Starlette/AnyIO deprecation warning.
 
 ## Commands
 

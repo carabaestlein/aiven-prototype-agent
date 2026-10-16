@@ -78,6 +78,48 @@ def test_approval_without_generation_is_observed_for_entire_window():
     assert clock.now == 4
 
 
+def test_approval_final_partial_interval_does_not_begin_expiring_read():
+    clock = Clock()
+    budgets = []
+
+    def transport(request):
+        budget = request.extensions['timeout']['read']
+        budgets.append(budget)
+        # Successful requests take some time. The old loop made one extra
+        # request with only 0.4 seconds left, timed out and erased its success.
+        if budget < 0.5:
+            clock.now += budget
+            raise httpx.ReadTimeout('Synthetic end-of-window timeout', request=request)
+        clock.now += 0.2
+        return httpx.Response(200, json={'data': [row()]})
+
+    with httpx.Client(base_url='https://langfuse.test', transport=httpx.MockTransport(transport)) as client:
+        verify.verify_trace(client, TRACE, 'run', '2026-10-16T11:59:00Z', False,
+                            'configured-model', timeout=4, interval=1,
+                            monotonic=clock.monotonic, sleep=clock.sleep)
+    assert len(budgets) == 3 and all(budget >= 1 for budget in budgets)
+    assert clock.now == 4
+
+
+def test_approval_fails_if_reads_remain_unavailable_after_initial_success():
+    clock = Clock()
+    calls = []
+
+    def transport(request):
+        calls.append(request)
+        clock.now += 0.2
+        if len(calls) == 1:
+            return httpx.Response(200, json={'data': [row()]})
+        return httpx.Response(503)
+
+    with httpx.Client(base_url='https://langfuse.test', transport=httpx.MockTransport(transport)) as client:
+        with pytest.raises(verify.VerificationError, match='timed out'):
+            verify.verify_trace(client, TRACE, 'run', '2026-10-16T11:59:00Z', False,
+                                'configured-model', timeout=4, interval=1,
+                                monotonic=clock.monotonic, sleep=clock.sleep)
+    assert len(calls) == 3 and clock.now == 4
+
+
 @pytest.mark.parametrize('bad_row,diagnostic', [
     (row(session='another-run'), 'session'),
     (dict(row(), level='ERROR'), 'error observation'),

@@ -1,0 +1,114 @@
+{
+  "verified_at_utc": "2026-10-16T09:09:33.689873+00:00",
+  "project": "cara-test",
+  "source": {
+    "repository": "https://github.com/carabaestlein/aiven-prototype-agent",
+    "branch": "release/step1",
+    "intended_commit": "35cff71b56d8346be3acdb0364dc71a1c072b295",
+    "remote_ref_verified": true,
+    "resolved_build_sha_exposed": false
+  },
+  "endpoints": {
+    "agent": "https://01a143ee-18f7-7972-aebe-7cd8498afb71-8080.eur-1.aiven.app",
+    "langfuse": "https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app"
+  },
+  "services": [
+    {
+      "service_name": "prototype-agent",
+      "service_type": "application",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-50-1024",
+      "state": "RUNNING",
+      "plan_price_usd": 0.03836,
+      "create_time": "2026-10-16T08:57:17.790487Z",
+      "build_status": "SUCCESS",
+      "deployment_status": "COMPLETED",
+      "source_branch": "release/step1"
+    },
+    {
+      "service_name": "prototype-agent-pg",
+      "service_type": "pg",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-4",
+      "state": "RUNNING",
+      "plan_price_usd": 0.151,
+      "create_time": "2026-10-16T08:43:32.933199Z"
+    },
+    {
+      "service_name": "prototype-langfuse-ch",
+      "service_type": "clickhouse",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-8",
+      "state": "RUNNING",
+      "plan_price_usd": 0.2663,
+      "create_time": "2026-10-16T08:43:34.715840Z"
+    },
+    {
+      "service_name": "prototype-langfuse-pg",
+      "service_type": "pg",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-4",
+      "state": "RUNNING",
+      "plan_price_usd": 0.151,
+      "create_time": "2026-10-16T08:43:34.046499Z"
+    },
+    {
+      "service_name": "prototype-langfuse-valkey",
+      "service_type": "valkey",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-2",
+      "state": "RUNNING",
+      "plan_price_usd": 0.06164384,
+      "create_time": "2026-10-16T08:43:35.298218Z"
+    },
+    {
+      "service_name": "prototype-langfuse-web",
+      "service_type": "application",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-200-4096",
+      "state": "RUNNING",
+      "plan_price_usd": 0.13425,
+      "create_time": "2026-10-16T08:51:20.158360Z",
+      "build_status": "SUCCESS",
+      "deployment_status": "COMPLETED",
+      "source_branch": "release/step1"
+    },
+    {
+      "service_name": "prototype-langfuse-worker",
+      "service_type": "application",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-200-4096",
+      "state": "RUNNING",
+      "plan_price_usd": 0.13425,
+      "create_time": "2026-10-16T08:54:22.939008Z",
+      "build_status": "SUCCESS",
+      "deployment_status": "COMPLETED",
+      "source_branch": "release/step1"
+    }
+  ],
+  "base_price_usd_per_hour": 0.93680384,
+  "tests": {
+    "agent_and_deployment": 62,
+    "langfuse_starter": 11
+  },
+  "live_checks": {
+    "agent_password_login": true,
+    "langfuse_admin_login": true,
+    "langfuse_project_keys": true,
+    "gateway_model": "claude-sonnet-5",
+    "initial_generation_total_tokens": 124,
+    "trace_parent_session_usage_release": true,
+    "agent_process_restart": true,
+    "saved_checkpoint_and_draft_preserved": true,
+    "revision_and_approval_complete": true,
+    "approval_no_generation_observation_seconds": 90,
+    "langfuse_web_and_worker_process_restart": true,
+    "old_traces_read_after_restart": true,
+    "new_trace_ingested_after_restart": true
+  },
+  "limits": [
+    "Source revision is backed by frozen remote ref and configuration; Runtime did not expose an independent resolved build SHA.",
+    "Recovery was tested at a saved review checkpoint, not an abrupt mid-model crash.",
+    "No autonomous continuation scheduler or exactly-once model guarantee."
+  ]
+}

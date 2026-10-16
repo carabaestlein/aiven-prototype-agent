@@ -44,7 +44,9 @@ The local port is published only on loopback. Local PostgreSQL uses the private 
 
 `docker compose down` preserves data. `docker compose down -v` permanently deletes local requests, drafts and checkpoints.
 
-## Deploy on Aiven Runtime
+## Deploy the agent alone on Aiven Runtime
+
+For the complete AI Gateway and self-hosted Langfuse stack, use [DEPLOYMENT.md](DEPLOYMENT.md). The following Console instructions deploy the agent and PostgreSQL only.
 
 1. Commit and push this repository to GitHub so Runtime can access it.
 2. In Aiven Console, deploy an application from the repo and scan **compose.aiven.yaml**.
@@ -118,7 +120,7 @@ python3 -m venv .venv
 
 Direct dependencies and the resolved dependency set are pinned. `constraints.txt` records the tested resolution; refresh it deliberately when upgrading. Modify `workflow.py` to replace the draft and review nodes, then update the UI and API if the new state needs different inputs.
 
-Tests use an in-memory checkpointer and run index; production has no in-memory fallback. See [VALIDATION.md](VALIDATION.md) for completed checks and pending live PostgreSQL tests. Runtime may ignore Dockerfile HEALTHCHECK, so verify readiness and workflow behaviour separately.
+Default workflow unit tests use an in-memory checkpointer and run index; production always requires PostgreSQL. Opt-in tests in `tests/test_postgres.py` also verify persisted review and failed-step recovery across reopened PostgreSQL connections and rebuilt graphs; these passed locally against PostgreSQL 16.2. See [STEP1_VALIDATION.md](STEP1_VALIDATION.md) for current evidence and [VALIDATION.md](VALIDATION.md) for upstream validation history. Runtime may ignore Dockerfile HEALTHCHECK, so verify readiness and workflow behaviour separately.
 
 ## References
 

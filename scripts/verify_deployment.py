@@ -144,8 +144,20 @@ def verify_trace(client, target_trace, run_id, since, expect_generation, request
     deadline = monotonic() + timeout
     found_complete = False
     latest_read_complete = False
+    has_polled = False
     until = timestamp(utc_now() + timedelta(minutes=5))
     while monotonic() < deadline:
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            break
+        if has_polled and remaining < interval:
+            # Do not start a last read with a deadline-shortened timeout. Its
+            # failure could erase the last complete poll solely because the
+            # observation window is ending. Keep waiting through the window,
+            # preserving success/failure from the last properly timed read.
+            sleep(remaining)
+            continue
+        has_polled = True
         rows = observations(client, target_trace, since, until, deadline, monotonic)
         latest_read_complete = rows is not None
         if rows is not None:
