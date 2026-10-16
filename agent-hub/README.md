@@ -6,6 +6,7 @@ A minimal Backstage 1.55 portal in the same repository as the Phase 1 LangGraph 
 - **New agent:** an approved Scaffolder template copies the tested Phase 1 code into `agents/<name>` and opens a draft pull request in `carabaestlein/aiven-prototype-agent`.
 - **Shared services:** agents reuse AI Gateway and Langfuse infrastructure, with their own PostgreSQL databases and Langfuse project keys.
 - **Hub hosting:** a repository-root `Dockerfile.agent-hub`, Runtime configuration, GitHub sign-in and PostgreSQL persistence.
+- **Aiven interface:** locally hosted official logo/fonts, a shared dark theme, searchable agent catalog, service shortcuts and a branded Scaffolder flow. Brand assets and their provenance are recorded in [SOURCES.md](packages/app/public/brand/SOURCES.md).
 
 ## Run locally
 
@@ -22,7 +23,7 @@ Open <http://localhost:3000>. Local guest access and persistent SQLite need no s
 ## Use it
 
 1. Open **Agents → Prototype Agent** for the existing agent and its service/observability links.
-2. Open **New agent → LangGraph agent on Aiven** and provide a name, team and Langfuse project ID. Organization settings have Phase 1 defaults.
+2. Open **Create an agent → Use template** and provide a name, team and Langfuse project ID. Organization settings have Phase 1 defaults.
 3. Review and merge the generated pull request. Its README explains isolated database creation, secrets and Runtime deployment.
 4. Register the merged agent catalog file, then add the verified endpoint after deployment.
 

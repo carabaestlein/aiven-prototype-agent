@@ -2,7 +2,7 @@
 
 The template produces a draft pull request in **the same Phase 1 repository**, under `agents/<name>`. It copies the existing LangGraph application, PostgreSQL checkpointing, review flow and Langfuse instrumentation with parameterized deployment settings. It does not provision cloud resources during a Scaffolder run.
 
-1. Open **Create → LangGraph agent on Aiven**. Choose a unique agent name, owning group and description.
+1. Open **Create an agent → LangGraph agent on Aiven → Use template**. Choose a unique agent name, owning group and description.
 2. Keep the organization repository, Aiven project, region and existing PostgreSQL service defaults unless an approved target requires different settings. Choose the model mode: **Deterministic local demo** needs no model credentials; **Aiven AI Gateway** uses the chosen model when its private key is configured. The default model matches Phase 1; verify that the project's Gateway key can access it.
 3. Enter a Langfuse project ID from the existing self-hosted instance. Prefer a new project for this agent and follow [Langfuse setup](LANGFUSE.md). Enter `prototype-project` only if intentionally sharing the first agent's trace project. Never enter API keys in this form.
 4. For a no-token preview, run `yarn test:template` from `agent-hub`, or dry-run only the fetch step in the template editor with publishing removed. With the Hub's GitHub integration configured, a normal Create run opens a real draft PR on `agents/<name>` targeting the selected base branch. Review its code/configuration and merge when ready. A duplicate agent name/branch needs a new unique name rather than overwriting existing work.

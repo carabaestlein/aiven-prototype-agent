@@ -11,7 +11,7 @@ yarn start
 
 Open [localhost:3000](http://localhost:3000). The backend listens on `127.0.0.1:7007`. Local development uses guest sign-in and a separate SQLite file for each plugin in `packages/backend/.backstage-dev-db/`, excluded from Git. Catalog additions and task history survive backend restarts. The first agent and template load from their checked-in files. File-backed SQLite also avoids the CLI's in-memory database IPC bridge, which timed out during a fresh combined frontend/backend start in this environment.
 
-In **Catalog**, select the **agent** type and open **Prototype Agent**. Its details show the owner, dependencies and links to the existing agent, Runtime service and Langfuse project/traces/sessions. Those external tools keep their own authentication. No Gateway or Langfuse keys are required to browse this catalog.
+In **Agents**, open **Prototype Agent**. Search matches agent names, owners and descriptions. Its details show the owner, dependencies and links to the existing agent, Runtime service and Langfuse project/traces/sessions. Those external tools keep their own authentication. No Gateway or Langfuse keys are required to browse this catalog.
 
 Open **Create** to view the approved LangGraph template. With no GitHub token, run `yarn test:template` (`scripts/test-template.cjs`) to render and inspect representative output, or use a fetch-only template-editor dry run with the publish step removed. A full normal Create run requires the GitHub integration and opens a real draft PR. To actually open draft pull requests, privately export a GitHub token scoped to this repository with Contents and Pull requests write permission, then run:
 
