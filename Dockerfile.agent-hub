@@ -18,8 +18,9 @@ RUN node .yarn/releases/yarn-4.13.0.cjs workspaces focus --all --production
 COPY --chown=node:node agent-hub/app-config.yaml agent-hub/app-config.production.yaml ./
 COPY --chown=node:node agent-hub/catalog/ ./catalog/
 COPY --chown=node:node agent-hub/templates/ ./templates/
+COPY --chown=node:node agent-hub/scripts/runtime-env.cjs ./scripts/runtime-env.cjs
 ENV NODE_ENV=production
 USER node
 EXPOSE 7007
 # Guest auth is omitted by the production backend. OAuth and PostgreSQL are required.
-CMD ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.production.yaml"]
+CMD ["node", "--require", "./scripts/runtime-env.cjs", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.production.yaml"]

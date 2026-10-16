@@ -33,12 +33,14 @@ Configure the following values in Runtime. Values marked secret belong in Runtim
 | `POSTGRES_DATABASE` | Dedicated Hub database, e.g. `backstage_agent_hub` |
 | `POSTGRES_USER` | Dedicated Hub database login |
 | `POSTGRES_PASSWORD` | **Secret:** that user's password |
-| `POSTGRES_CA_CERT` | Aiven CA certificate in PEM form, preserving its line breaks |
+| `POSTGRES_CA_CERT_BASE64` | Single-line base64 of the complete Aiven PEM CA certificate, including BEGIN/END lines |
 | `AUTH_GITHUB_CLIENT_ID` | GitHub sign-in OAuth client ID |
 | `AUTH_GITHUB_CLIENT_SECRET` | **Secret:** GitHub sign-in OAuth client secret |
 | `GITHUB_TOKEN` | **Secret:** repository-scoped integration token |
 
 Once Runtime assigns the public route, ensure `HUB_BASE_URL`, OAuth homepage and callback use exactly that origin and redeploy if necessary. Do not derive the HTTPS route from Aiven's generic `service_uri`. Do not add agent, Gateway or Langfuse keys to the Hub just to display links.
+
+Runtime environment values must be single-line strings. Encode the downloaded CA with `openssl base64 -A -in ca.pem` and supply that result as `POSTGRES_CA_CERT_BASE64`. The container preloads `scripts/runtime-env.cjs` before starting Backstage: it strictly decodes base64, validates the PEM with Node's X.509 parser, requires a CA certificate, then sets the multiline `POSTGRES_CA_CERT` consumed by the production configuration. Invalid or missing input stops startup without logging the supplied value. `rejectUnauthorized: true` remains enabled. When starting the production bundle outside Docker, use the same `node --require ./scripts/runtime-env.cjs packages/backend --config app-config.yaml --config app-config.production.yaml` command from `agent-hub`.
 
 The existing Aiven database credential integration may supply the database's default URI; this Hub expects separate connection fields for its isolated database/user. Verify any integration mapping instead of connecting it to `defaultdb` by accident.
 
