@@ -14,6 +14,6 @@ services:
       TRACE_CONTENT: "false"
       # Set MODEL_MODE=openai-compatible after adding MODEL_API_KEY as a Runtime secret.
       # Add APP_PASSWORD, SESSION_SECRET, APP_API_KEY and PG_CA_CERT_BASE64 in Runtime.
-      # Add LANGFUSE_BASE_URL and both project keys from the self-hosted Langfuse project.
+      # Add LANGFUSE_BASE_URL, LANGFUSE_PROJECT_ID and both project keys from self-hosted Langfuse.
   langgraph-postgres:
     image: postgres:16

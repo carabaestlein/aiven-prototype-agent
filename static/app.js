@@ -8,7 +8,29 @@ const statusLabels = {
 let csrf = '', current = null, authenticated = false, busy = false;
 let routeVersion = 0, sessionVersion = 0, historyVersion = 0;
 let historyLoading = false, runs = [], operationMessage = '';
+let langfuse = null;
 const feedbackDrafts = new Map();
+
+function externalLink(id, href) {
+  const link = $(id);
+  link.hidden = true;
+  link.removeAttribute('href');
+  if (!href) return;
+  try {
+    const url = new URL(href);
+    const local = url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname);
+    if ((url.protocol !== 'https:' && !local) || url.username || url.password) return;
+    link.href = url.href;
+    link.hidden = false;
+  } catch { /* Hide a malformed optional link without interrupting the workspace. */ }
+}
+
+function configureLangfuse(configuration) {
+  langfuse = configuration || null;
+  externalLink('langfuse-project', langfuse?.project_url);
+  externalLink('langfuse-run', null);
+  $('trace-disclosure').hidden = !langfuse?.capture_content;
+}
 
 function notice(message = '', link = null) {
   const target = $('notice');
@@ -53,6 +75,7 @@ function showLogin() {
   authenticated = false;
   csrf = '';
   current = null;
+  configureLangfuse(null);
   runs = [];
   feedbackDrafts.clear();
   sessionVersion += 1;
@@ -84,6 +107,7 @@ async function enter() {
   $('workspace-nav').hidden = false;
   $('logout').hidden = false;
   $('mode').textContent = session.mode === 'mock' ? 'Demo mode' : session.model;
+  configureLangfuse(session.langfuse);
   if (!location.hash) history.replaceState(null, '', '#/new');
   await showRoute();
 }
@@ -124,6 +148,7 @@ async function showRoute() {
   if (!authenticated) return;
   saveFeedback();
   current = null;
+  externalLink('langfuse-run', null);
   const version = ++routeVersion;
   const selected = route();
   notice(busy ? operationMessage : '');
@@ -235,6 +260,8 @@ async function refreshHistory(version = routeVersion) {
 function renderRun(run) {
   const previousFocus = document.activeElement;
   current = run;
+  externalLink('langfuse-run', langfuse?.sessions_url && UUID.test(run.id)
+    ? `${langfuse.sessions_url}/${encodeURIComponent(run.id)}` : null);
   $('detail-view').setAttribute('aria-busy', 'false');
   $('detail-heading').textContent = run.status === 'completed' ? 'Completed run'
     : run.status === 'awaiting_review' ? 'Review your draft' : 'Continue your run';

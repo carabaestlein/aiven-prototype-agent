@@ -13,7 +13,7 @@ Langfuse's starter already supplies pinned web/worker images, TLS setup, ClickHo
 - AI Gateway is the default endpoint; real mode remains explicit.
 - Langfuse Python SDK **4.18.0** is pinned for server **4.38.0**. SDK v5 requires server >=4.59.0; upgrade both deliberately.
 - Each graph invocation gets a `langgraph.run` span and returns `trace_id`. Actual model calls create child `gateway.chat` generations with model, usage and timing. Every invocation for the same saved run shares its Langfuse session ID. Read-only API calls do not create traces.
-- Prompt/draft capture defaults off; `TRACE_CONTENT=true` enables it for synthetic testing. Provider errors record only exception type. Telemetry export failure does not retry the model call. Graceful shutdown drains tracing; a hard kill can still lose unexported spans.
+- Content capture defaults off. Enabling it records prompts, review feedback and drafts in this project's self-hosted Langfuse. Provider errors record only exception type. Telemetry export failure does not retry the model call. Graceful shutdown drains tracing; a hard kill can still lose unexported spans.
 - `scripts/verify_deployment.py` verifies stored observations, checkpoints and review after an externally performed restart.
 
 ## Deployment order
@@ -66,6 +66,8 @@ Publish a new frozen branch and verify its remote SHA first. With `AIVEN_API_TOK
 Omit `--apply` for a read-only plan. This path requires the existing owned `prototype-agent`, replaces only its complete application configuration, and explicitly requests a rebuild. It never creates a service or updates Langfuse or databases. The PostgreSQL credential integration remains in place; application and tracing credentials are reconstructed from private state, never copied from redacted API responses. Each explicit retry requests a rebuild.
 
 The state file retains the original stack `branch`/`release` and adds `agent_source` with the new branch/SHA before the update. A later full-stack resume still uses the original command above and honors the stored agent override, so it does not revert the UI. Keep this state file private and back it up. The helper's readiness result does **not** prove the new build is serving: wait for the new build to complete, compare the deployed assets with the release, and check the UI and existing saved runs before declaring the update complete.
+
+Add `--trace-content true` to an agent-only or full `--apply` command to capture prompts, review feedback and drafts in your own Langfuse project (`prototype-project`). Use `--trace-content false` to disable it. The private state stores the choice as a boolean; omitting the flag preserves it across agent updates and full-stack resumes. Existing state without this field defaults to false. Content omitted from historical traces cannot be recovered by enabling capture later.
 
 ## Acceptance sequence
 

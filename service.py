@@ -97,7 +97,10 @@ class RunService:
                     span.update(level='ERROR', status_message=type(exc).__name__)
                 else:
                     result = self.view(run_id)
-                span.update(output={k: result[k] for k in ('status', 'revision', 'checkpoint')})
+                output = {k: result[k] for k in ('status', 'revision', 'checkpoint')}
+                if self.telemetry.capture_content:
+                    output['draft'] = result['draft']
+                span.update(output=output)
                 if span.trace_id:
                     result['trace_id'] = span.trace_id
                 return result

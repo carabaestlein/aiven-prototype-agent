@@ -142,7 +142,13 @@ def create_app(settings=None, service=None):
     @app.get('/api/session')
     def session(request: Request, auth=Depends(authenticate)):
         cfg = request.app.state.settings
-        return {'csrf': auth.get('csrf'), 'mode': cfg.mode, 'model': cfg.model if cfg.mode != 'mock' else None}
+        langfuse = None
+        if cfg.langfuse_base and cfg.langfuse_project_id:
+            project_url = cfg.langfuse_base + '/project/' + cfg.langfuse_project_id
+            langfuse = {'project_url': project_url, 'sessions_url': project_url + '/sessions',
+                        'capture_content': cfg.trace_content}
+        return {'csrf': auth.get('csrf'), 'mode': cfg.mode, 'model': cfg.model if cfg.mode != 'mock' else None,
+                'langfuse': langfuse}
 
     @app.post('/api/logout')
     def logout(response: Response, auth=Depends(authenticate)):

@@ -79,7 +79,7 @@ def runtime_origin(service):
 
 
 def env_entries(values):
-    public = {'MODEL_MODE', 'MODEL_BASE_URL', 'MODEL_NAME', 'LANGFUSE_BASE_URL', 'TRACE_CONTENT',
+    public = {'MODEL_MODE', 'MODEL_BASE_URL', 'MODEL_NAME', 'LANGFUSE_BASE_URL', 'LANGFUSE_PROJECT_ID', 'TRACE_CONTENT',
               'APP_ENVIRONMENT', 'APP_RELEASE', 'NEXTAUTH_URL', 'CLICKHOUSE_URL', 'CLICKHOUSE_DB',
               'CLICKHOUSE_MIGRATION_URL', 'S3_REGION', 'S3_ENDPOINT', 'S3_FORCE_PATH_STYLE',
               'LANGFUSE_BACKGROUND_MIGRATION_V4_ENABLE_HISTORIC_BACKFILL', 'LANGSMITH_TRACING',
@@ -129,7 +129,8 @@ def new_state(args, environ):
     values['LANGFUSE_INIT_PROJECT_PUBLIC_KEY'] = 'pk-lf-' + secrets.token_hex(16)
     values['LANGFUSE_INIT_PROJECT_SECRET_KEY'] = 'sk-lf-' + secrets.token_hex(32)
     return {'version': 1, 'project': PROJECT, 'owner': secrets.token_hex(16),
-            'branch': args.branch, 'release': args.release, 'values': values, 'stage': 'prepared'}
+            'branch': args.branch, 'release': args.release, 'values': values, 'stage': 'prepared',
+            'trace_content': False}
 
 
 class Deployer:
@@ -329,13 +330,23 @@ def clickhouse_settings(service):
             'CLICKHOUSE_USER': user, 'CLICKHOUSE_PASSWORD': password, 'CLICKHOUSE_DB': 'langfuse'}
 
 
+def trace_content_setting(state, override=None):
+    value = state.get('trace_content', False)
+    require(type(value) is bool, 'Private state trace_content must be a boolean.')
+    if override is not None:
+        require(type(override) is bool, 'Trace content override must be a boolean.')
+        value = override
+    return value
+
+
 def agent_environment(state, ca):
     private = state['values']
     agent = {key: private[key] for key in ('APP_PASSWORD', 'APP_API_KEY', 'SESSION_SECRET', 'MODEL_API_KEY')}
     agent.update(PG_CA_CERT_BASE64=ca, MODEL_MODE='openai-compatible', MODEL_BASE_URL='https://ai.aiven.io/v1',
         MODEL_NAME='claude-sonnet-5', LANGFUSE_BASE_URL=state['langfuse_url'],
         LANGFUSE_PUBLIC_KEY=private['LANGFUSE_INIT_PROJECT_PUBLIC_KEY'],
-        LANGFUSE_SECRET_KEY=private['LANGFUSE_INIT_PROJECT_SECRET_KEY'], TRACE_CONTENT='false',
+        LANGFUSE_SECRET_KEY=private['LANGFUSE_INIT_PROJECT_SECRET_KEY'], LANGFUSE_PROJECT_ID='prototype-project',
+        TRACE_CONTENT='true' if trace_content_setting(state) else 'false',
         APP_ENVIRONMENT=PROJECT, APP_RELEASE=state.get('agent_source', state)['release'],
         LANGSMITH_TRACING='false', LANGCHAIN_TRACING_V2='false')
     return agent
@@ -343,6 +354,7 @@ def agent_environment(state, ca):
 
 def preflight_agent(deployer, state):
     require(state and state.get('langfuse_url'), 'Agent-only deployment requires an existing private deployment state with Langfuse configured.')
+    trace_content_setting(state)
     origin(state['langfuse_url'])
     required = ('APP_PASSWORD', 'APP_API_KEY', 'SESSION_SECRET', 'MODEL_API_KEY',
                 'LANGFUSE_INIT_PROJECT_PUBLIC_KEY', 'LANGFUSE_INIT_PROJECT_SECRET_KEY')
@@ -357,13 +369,14 @@ def preflight_agent(deployer, state):
             'Existing agent configuration differs from this deployment.')
 
 
-def apply_agent(deployer, state, path, branch, release):
+def apply_agent(deployer, state, path, branch, release, trace_content=None):
     preflight_agent(deployer, state)
     certificate = deployer.call('GET', f'/project/{PROJECT}/kms/ca')['certificate']
     ca = base64.b64encode(certificate.encode()).decode()
     # Save the intended source before mutation so an interrupted deployment can
     # resume without rotating credentials or silently reverting on full apply.
     state['agent_source'] = {'branch': branch, 'release': release}
+    state['trace_content'] = trace_content_setting(state, trace_content)
     state['agent_update'] = 'requested'
     save_state(path, state)
     deployer.app('prototype-agent', agent_environment(state, ca), state,
@@ -377,7 +390,9 @@ def apply_agent(deployer, state, path, branch, release):
             'agent_source': state['agent_source'], 'build_commit_verification': 'pending'}
 
 
-def apply(deployer, state, path, data_only=False):
+def apply(deployer, state, path, data_only=False, trace_content=None):
+    state['trace_content'] = trace_content_setting(state, trace_content)
+    save_state(path, state)
     for name, (kind, plan, config) in DATA.items():
         deployer.ensure_service(name, kind, plan, config, state)
     data = deployer.wait_services(DATA)
@@ -427,11 +442,13 @@ def main(argv=None):
     parser.add_argument('--apply', action='store_true', help='Create/reconcile only the dedicated tagged new stack.')
     parser.add_argument('--data-only', action='store_true', help='Create and wait for the four data services; do not build applications yet.')
     parser.add_argument('--agent-only', action='store_true', help='Update only the existing owned agent to --branch/--release; preserve all data and Langfuse services.')
+    parser.add_argument('--trace-content', choices=('true', 'false'), help='Persist prompt, feedback and draft capture in self-hosted Langfuse; omission preserves the saved choice (default false).')
     parser.add_argument('--state', type=Path, help='Private state file outside the repository; required for apply.')
     parser.add_argument('--branch', default='main')
     parser.add_argument('--release', required=True, help='Full Git commit SHA, recorded in app telemetry.')
     parser.add_argument('--timeout', type=float, default=1800, help='Total deadline in seconds, including polling every 10 seconds.')
     args = parser.parse_args(argv)
+    trace_content = None if args.trace_content is None else args.trace_content == 'true'
     try:
         require(re.fullmatch(r'[0-9a-f]{40}', args.release) and re.fullmatch(r'[a-zA-Z0-9_./-]+', args.branch), 'Supply a valid full release SHA and branch.')
         require(0 < args.timeout <= 7200, 'Timeout must be between 0 and 7200 seconds.')
@@ -442,6 +459,8 @@ def main(argv=None):
         if args.state:
             require(not args.state.resolve().is_relative_to(Path(__file__).resolve().parents[1]), 'Private deployment state must be outside the repository.')
         state = load_state(args.state)
+        if state:
+            trace_content_setting(state)
         if state and not args.agent_only:
             require(state['branch'] == args.branch and state['release'] == args.release, 'Use the original branch/release when resuming this state.')
         options = dict(follow_redirects=False, trust_env=False, verify=True)
@@ -451,10 +470,11 @@ def main(argv=None):
                 if args.agent_only:
                     preflight_agent(deployer, state)
                     if args.apply:
-                        result = apply_agent(deployer, state, args.state, args.branch, args.release)
+                        result = apply_agent(deployer, state, args.state, args.branch, args.release, trace_content)
                     else:
                         result = {'status': 'plan', 'services': ['prototype-agent'], 'creates_resources': False,
-                                  'agent_source': {'branch': args.branch, 'release': args.release}}
+                                  'agent_source': {'branch': args.branch, 'release': args.release},
+                                  'trace_content': trace_content_setting(state, trace_content)}
                     print(json.dumps(result))
                     return 0
                 deployer.preflight(state)
@@ -466,7 +486,7 @@ def main(argv=None):
                 if state is None:
                     state = new_state(args, os.environ)
                     save_state(args.state, state)
-                result = apply(deployer, state, args.state, args.data_only)
+                result = apply(deployer, state, args.state, args.data_only, trace_content)
                 print(json.dumps(result))
         return 0
     except DeploymentError as exc:

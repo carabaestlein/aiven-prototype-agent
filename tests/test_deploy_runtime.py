@@ -145,12 +145,14 @@ def test_clickhouse_absent_ssl_metadata_uses_tls_and_preserves_raw_password():
         deploy.clickhouse_settings(service)
 
 
-def test_full_flow_waits_for_web_before_worker_and_shares_stable_configuration(tmp_path):
+@pytest.mark.parametrize('trace_content', [False, True])
+def test_full_flow_waits_for_web_before_worker_and_shares_stable_configuration(tmp_path, trace_content):
     events, apps = [], {}
     inputs = {key: 'private-test-value' for key in deploy.INPUTS}
     inputs['S3_ENDPOINT'] = 'https://storage.example.test'
     private = deploy.new_state(Namespace(branch='main', release='a' * 40), inputs)
     private['agent_source'] = {'branch': 'release/ui-refresh', 'release': 'b' * 40}
+    private['trace_content'] = trace_content
 
     class Stub:
         def ensure_service(self, name, *args):
@@ -191,6 +193,8 @@ def test_full_flow_waits_for_web_before_worker_and_shares_stable_configuration(t
     assert apps['prototype-agent']['LANGFUSE_SECRET_KEY'] == private['values']['LANGFUSE_INIT_PROJECT_SECRET_KEY']
     assert apps['prototype-agent']['APP_API_KEY'] == private['values']['APP_API_KEY']
     assert apps['prototype-agent']['APP_RELEASE'] == 'b' * 40
+    assert apps['prototype-agent']['TRACE_CONTENT'] == str(trace_content).lower()
+    assert deploy.load_state(tmp_path / 'private.json')['trace_content'] is trace_content
     assert result['status'] == 'ready' and 'private' not in json.dumps(result)
 
 
@@ -305,8 +309,10 @@ def agent_state():
     return private
 
 
-def test_agent_only_rebuild_preserves_secrets_and_never_mutates_dependencies(tmp_path):
+@pytest.mark.parametrize('trace_content', [False, True])
+def test_agent_only_rebuild_preserves_secrets_and_never_mutates_dependencies(tmp_path, trace_content):
     private, requests = agent_state(), []
+    private['trace_content'] = not trace_content
     initial_values = dict(private['values'])
     service = {'tags': {'prototype_step1': private['owner']}, 'service_type': 'application',
                'cloud_name': deploy.CLOUD, 'plan': deploy.APPS['prototype-agent'][0], 'state': 'RUNNING',
@@ -331,7 +337,7 @@ def test_agent_only_rebuild_preserves_secrets_and_never_mutates_dependencies(tmp
     path = tmp_path / 'private.json'
     with httpx.Client(transport=httpx.MockTransport(respond)) as client:
         runner = deploy.Deployer(client, client)
-        result = deploy.apply_agent(runner, private, path, 'release/ui-refresh', 'b' * 40)
+        result = deploy.apply_agent(runner, private, path, 'release/ui-refresh', 'b' * 40, trace_content)
         # Explicit retries rebuild even when the selected branch has not changed.
         deploy.apply_agent(runner, deploy.load_state(path), path, 'release/ui-refresh', 'b' * 40)
     mutations = [(method, url, body) for method, url, body in requests if method != 'GET']
@@ -344,11 +350,14 @@ def test_agent_only_rebuild_preserves_secrets_and_never_mutates_dependencies(tmp
     for key in ('APP_PASSWORD', 'APP_API_KEY', 'SESSION_SECRET', 'MODEL_API_KEY'):
         assert env[key] == initial_values[key]
     assert env['LANGFUSE_SECRET_KEY'] == initial_values['LANGFUSE_INIT_PROJECT_SECRET_KEY']
+    assert env['TRACE_CONTENT'] == str(trace_content).lower()
+    assert {'key': 'LANGFUSE_PROJECT_ID', 'value': 'prototype-project', 'kind': 'variable'} in app['environment_variables']
     assert '<redacted>' not in env.values() and 'DATABASE_URL' not in env
     saved = deploy.load_state(path)
     assert saved['values'] == initial_values
     assert saved['branch'] == 'release/step1' and saved['release'] == 'a' * 40
     assert saved['agent_source'] == {'branch': 'release/ui-refresh', 'release': 'b' * 40}
+    assert saved['trace_content'] is trace_content
     assert result['build_commit_verification'] == 'pending'
 
 
@@ -379,9 +388,27 @@ def test_agent_only_plan_accepts_new_release_and_does_not_write(monkeypatch, tmp
         transport=httpx.MockTransport(respond), **kwargs))
     monkeypatch.setenv('AIVEN_API_TOKEN', 'private-test-token')
     assert deploy.main(['--agent-only', '--state', str(path), '--branch', 'release/ui-refresh',
-                        '--release', 'b' * 40]) == 0
+                        '--release', 'b' * 40, '--trace-content', 'true']) == 0
     assert len(requests) == 1 and requests[0].method == 'GET'
     assert requests[0].url.path.endswith('/service/prototype-agent')
     assert deploy.load_state(path) == private
     output = json.loads(capsys.readouterr().out)
     assert output['creates_resources'] is False and output['services'] == ['prototype-agent']
+    assert output['trace_content'] is True
+
+
+@pytest.mark.parametrize('invalid', ['false', 'true', 0, 1, None])
+def test_trace_content_rejects_non_boolean_saved_values_before_deployment(tmp_path, invalid):
+    private = agent_state()
+    private['trace_content'] = invalid
+    with pytest.raises(deploy.DeploymentError, match='must be a boolean'):
+        deploy.apply(None, private, tmp_path / 'state.json')
+    with pytest.raises(deploy.DeploymentError, match='must be a boolean'):
+        deploy.apply_agent(None, private, tmp_path / 'state.json', 'release/ui-refresh', 'b' * 40)
+    assert not (tmp_path / 'state.json').exists()
+
+
+def test_legacy_state_defaults_content_capture_off():
+    private = agent_state()
+    private.pop('trace_content')
+    assert deploy.agent_environment(private, 'test-ca')['TRACE_CONTENT'] == 'false'

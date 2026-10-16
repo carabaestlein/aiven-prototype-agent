@@ -141,9 +141,11 @@ def test_prompt_and_response_capture_requires_opt_in(tracing, monkeypatch, captu
     assert ('Private generated answer' in serialized) is capture_content
     if capture_content:
         assert json.loads(root.attributes['langfuse.observation.input'])['request'] == 'Private user request'
+        assert json.loads(root.attributes['langfuse.observation.output'])['draft'] == result['draft']
         assert json.loads(generation.attributes['langfuse.observation.input'])[1]['content'] == 'Private user request'
         assert generation.attributes['langfuse.observation.output'] == 'Private generated answer'
     else:
+        assert 'draft' not in json.loads(root.attributes['langfuse.observation.output'])
         assert 'langfuse.observation.input' not in root.attributes
         assert 'langfuse.observation.input' not in generation.attributes
         assert 'langfuse.observation.output' not in generation.attributes

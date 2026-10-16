@@ -16,6 +16,8 @@ This repository uses the open-source LangGraph library inside its own Python app
 
 The dark workspace has separate **New run** (`#/new`) and searchable **Past runs** (`#/runs`) screens. Each saved run has its own link for review, revision, approval and copying the result. Unsubmitted requests and feedback survive navigation within the page; saved drafts also survive reloads. The interface follows the current [Aiven branding](static/brand/SOURCES.md), with locally hosted fonts and logo.
 
+With `LANGFUSE_PROJECT_ID` configured alongside the Langfuse URL and keys, **View run in Langfuse** opens the session containing that run's draft, revisions and approval. `TRACE_CONTENT=true` records prompts, feedback and generated drafts in your self-hosted Langfuse project; the composer displays this setting. The default remains metadata-only. Content omitted from historical traces is not backfilled.
+
 **Mock mode is the default.** It produces explicitly labelled, deterministic demo text and makes no model-provider calls. Real mode calls an OpenAI-compatible chat-completions endpoint using your chosen model and private API key. Approving a draft only marks it complete; nothing is sent or published.
 
 ```text

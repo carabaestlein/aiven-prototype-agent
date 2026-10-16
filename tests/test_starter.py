@@ -97,6 +97,36 @@ def test_login_rate_limit_and_secure_cookie():
         assert client.post('/api/login',json={'password':'wrong'}).status_code == 429
 
 
+def test_session_langfuse_links_require_authentication_and_never_expose_credentials():
+    cfg = config()
+    cfg.langfuse_base = 'https://langfuse.example.test'
+    cfg.langfuse_project_id = 'prototype-project'
+    cfg.langfuse_public_key = 'pk-lf-private-project-key'
+    cfg.langfuse_secret_key = 'sk-lf-private-project-secret'
+    cfg.trace_content = True
+    with TestClient(create_app(cfg, MemoryRuns(cfg))) as client:
+        assert client.get('/api/session').status_code == 401
+        response = client.get('/api/session', headers={'Authorization': 'Bearer ' + cfg.api_key})
+        assert response.status_code == 200
+        assert response.json() == {'csrf': None, 'mode': 'mock', 'model': None, 'langfuse': {
+            'project_url': 'https://langfuse.example.test/project/prototype-project',
+            'sessions_url': 'https://langfuse.example.test/project/prototype-project/sessions',
+            'capture_content': True}}
+        for secret in (cfg.password, cfg.session_secret, cfg.api_key,
+                       cfg.langfuse_public_key, cfg.langfuse_secret_key):
+            assert secret not in response.text
+
+
+@pytest.mark.parametrize('base,project', [('', ''), ('https://langfuse.example.test', ''), ('', 'prototype-project')])
+def test_session_omits_unconfigured_langfuse_links(base, project):
+    cfg = config()
+    cfg.langfuse_base, cfg.langfuse_project_id = base, project
+    with TestClient(create_app(cfg, MemoryRuns(cfg))) as client:
+        response = client.get('/api/session', headers={'Authorization': 'Bearer ' + cfg.api_key})
+        assert response.status_code == 200
+        assert response.json()['langfuse'] is None
+
+
 def environment():
     return {'APP_PASSWORD':'p'*16,'SESSION_SECRET':'s'*32,'APP_API_KEY':'a'*32,
             'DATABASE_URL':'postgresql://u:p%40ss@db.example:5432/demo?sslmode=disable', 'LOCAL_DEVELOPMENT':'true'}
@@ -109,6 +139,21 @@ def test_settings_fail_closed(tmp_path):
     with pytest.raises(ValueError): Settings.load(env)
     env = environment();env['MODEL_MODE']='openai-compatible'
     with pytest.raises(ValueError): Settings.load(env)
+
+
+@pytest.mark.parametrize('project', ['../other', 'project/name', 'project?x=1', '%2f', 'with space', 'x' * 201])
+def test_settings_reject_unsafe_langfuse_project_id(project):
+    env = environment()
+    env['LANGFUSE_PROJECT_ID'] = project
+    with pytest.raises(ValueError, match='LANGFUSE_PROJECT_ID'):
+        Settings.load(env)
+
+
+def test_settings_accept_optional_langfuse_project_id():
+    env = environment()
+    assert Settings.load(env).langfuse_project_id == ''
+    env['LANGFUSE_PROJECT_ID'] = 'prototype_Project-123'
+    assert Settings.load(env).langfuse_project_id == env['LANGFUSE_PROJECT_ID']
 
 
 def test_settings_enforce_hostname_verification(tmp_path):

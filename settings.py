@@ -2,6 +2,7 @@ import base64
 from dataclasses import dataclass
 import os
 from pathlib import Path
+import re
 import ssl
 from urllib.parse import urlsplit, urlunsplit, urlencode
 
@@ -23,6 +24,7 @@ class Settings:
     trace_content: bool = False
     environment: str = "development"
     release: str = ""
+    langfuse_project_id: str = ""
 
     @classmethod
     def load(cls, env=None, ca_path=Path('/tmp/langgraph-ca.pem')):
@@ -61,6 +63,9 @@ class Settings:
         lf_base = env.get('LANGFUSE_BASE_URL', '').rstrip('/')
         lf_public = env.get('LANGFUSE_PUBLIC_KEY', '')
         lf_secret = env.get('LANGFUSE_SECRET_KEY', '')
+        lf_project = env.get('LANGFUSE_PROJECT_ID', '')
+        if lf_project and re.fullmatch(r'[A-Za-z0-9_-]{1,200}', lf_project) is None:
+            raise ValueError('LANGFUSE_PROJECT_ID must contain at most 200 letters, numbers, underscores or hyphens')
         if any((lf_base, lf_public, lf_secret)):
             target = urlsplit(lf_base)
             local_http = local and target.scheme == 'http' and target.hostname in ('localhost', '127.0.0.1')
@@ -70,4 +75,4 @@ class Settings:
                 raise ValueError('Langfuse requires an explicit HTTPS origin and both project keys (local loopback HTTP is allowed)')
         return cls(db, env['APP_PASSWORD'], env['SESSION_SECRET'], env['APP_API_KEY'], local, mode, model, key, base,
                    lf_base, lf_public, lf_secret, env.get('TRACE_CONTENT', '').lower() == 'true',
-                   env.get('APP_ENVIRONMENT', 'development'), env.get('APP_RELEASE', ''))
+                   env.get('APP_ENVIRONMENT', 'development'), env.get('APP_RELEASE', ''), lf_project)
