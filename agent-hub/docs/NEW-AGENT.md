@@ -1,0 +1,15 @@
+# Create an agent from the approved template
+
+The template produces a draft pull request in **the same Phase 1 repository**, under `agents/<name>`. It copies the existing LangGraph application, PostgreSQL checkpointing, review flow and Langfuse instrumentation with parameterized deployment settings. It does not provision cloud resources during a Scaffolder run.
+
+1. Open **Create → LangGraph agent on Aiven**. Choose a unique agent name, owning group and description.
+2. Keep the organization repository, Aiven project, region and existing PostgreSQL service defaults unless an approved target requires different settings. Choose the model mode: **Deterministic local demo** needs no model credentials; **Aiven AI Gateway** uses the chosen model when its private key is configured. The default model matches Phase 1; verify that the project's Gateway key can access it.
+3. Enter a Langfuse project ID from the existing self-hosted instance. Prefer a new project for this agent and follow [Langfuse setup](LANGFUSE.md). Enter `prototype-project` only if intentionally sharing the first agent's trace project. Never enter API keys in this form.
+4. For a no-token preview, run `yarn test:template` from `agent-hub`, or dry-run only the fetch step in the template editor with publishing removed. With the Hub's GitHub integration configured, a normal Create run opens a real draft PR on `agents/<name>` targeting the selected base branch. Review its code/configuration and merge when ready. A duplicate agent name/branch needs a new unique name rather than overwriting existing work.
+5. Follow the generated `agents/<name>/README.md`: prepare a separate database and user on the selected PostgreSQL service, add the application's authentication secrets, PostgreSQL CA and credentials, Gateway key and matching Langfuse project keys in Runtime, then deploy its generated Dockerfile from repository-root context. The generated `runtime.json` contains public configuration only; fill secrets privately rather than committing them.
+6. Verify readiness, an authenticated draft/revision/approval flow, persistence after restart and retrievable Langfuse observations. Update the generated catalog entry with the **actual** Runtime service URL and public endpoint. Keep `scaffolded` status/lifecycle until the agent has a verified deployment.
+7. After merge, select **Create → Register Existing Component** and provide the merged catalog file URL, for example `https://github.com/carabaestlein/aiven-prototype-agent/blob/main/agents/<name>/catalog-info.yaml`. This adds the new agent to the Hub without depending on a short-lived PR branch.
+
+The existing first agent remains registered independently in `catalog/entities.yaml`. Template output contains no secrets and is not a successful-deployment receipt. Source changes deploy through an explicit Runtime redeploy after review; pushing the generated code alone does not start a cloud service.
+
+See the [template's implementation notes](../templates/langgraph-agent/README.md) for its allowed repository and tests.

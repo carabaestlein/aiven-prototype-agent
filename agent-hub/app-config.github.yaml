@@ -1,0 +1,5 @@
+# Optional local overlay for actually opening template pull requests.
+integrations:
+  github:
+    - host: github.com
+      token: ${GITHUB_TOKEN}

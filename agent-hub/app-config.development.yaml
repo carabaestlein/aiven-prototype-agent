@@ -1,0 +1,11 @@
+backend:
+  database:
+    client: better-sqlite3
+    connection:
+      # One file per plugin; avoids the CLI's in-memory database IPC bridge.
+      directory: ./.backstage-dev-db
+
+auth:
+  environment: development
+  providers:
+    guest: {}

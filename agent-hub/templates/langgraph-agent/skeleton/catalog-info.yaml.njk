@@ -1,0 +1,28 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name | dump }}
+  description: ${{ values.description | dump }}
+  annotations:
+    github.com/project-slug: carabaestlein/aiven-prototype-agent
+    aiven.io/project: ${{ values.aivenProject | dump }}
+    aiven.io/service-name: ${{ values.name | dump }}
+    aiven.io/deployment-state: scaffolded
+    aiven.io/postgresql-service: ${{ values.postgresService | dump }}
+    langfuse.com/project-id: ${{ values.langfuseProjectId | dump }}
+    langfuse.com/project-url: ${{ values.langfuseUrl }}/project/${{ values.langfuseProjectId }}
+    langfuse.com/traces-url: ${{ values.langfuseUrl }}/project/${{ values.langfuseProjectId }}/traces
+    langfuse.com/sessions-url: ${{ values.langfuseUrl }}/project/${{ values.langfuseProjectId }}/sessions
+  tags: [agent, langgraph, aiven-runtime, langfuse]
+  links:
+    - title: Agent source
+      url: https://github.com/carabaestlein/aiven-prototype-agent/tree/${{ values.baseBranch }}/agents/${{ values.name }}
+      icon: github
+    - title: Configured Langfuse traces
+      url: ${{ values.langfuseUrl }}/project/${{ values.langfuseProjectId }}/traces
+      icon: dashboard
+spec:
+  type: agent
+  lifecycle: experimental
+  owner: ${{ values.owner | dump }}
+  system: agent-platform

@@ -1,0 +1,32 @@
+app:
+  title: Aiven Agent Hub
+  baseUrl: http://localhost:3000
+organization:
+  name: Aiven
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    host: 127.0.0.1
+    port: 7007
+  cors:
+    origin: http://localhost:3000
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  database:
+    client: better-sqlite3
+    connection: ':memory:'
+integrations:
+  github:
+    - host: github.com
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location, Group, User, Template]
+  locations:
+    - type: file
+      target: ../../catalog/entities.yaml
+    - type: file
+      target: ../../templates/langgraph-agent/template.yaml
+permission:
+  enabled: false
+# Minimal trusted-team portal: approved users share catalog and scaffolder access.
+# Do not use as a tenant isolation or per-team authorization boundary.

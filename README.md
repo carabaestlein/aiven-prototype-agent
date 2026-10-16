@@ -1,5 +1,7 @@
 # Aiven prototype agent — Step 1
 
+**Agent Hub:** The Backstage catalog and new-agent template are in [agent-hub/README.md](agent-hub/README.md).
+
 This project prepares the agent foundation; prototype generation is not implemented. See [DEPLOYMENT.md](DEPLOYMENT.md) for the cara-test deployment and [STEP1_VALIDATION.md](STEP1_VALIDATION.md) for current evidence.
 
 A starter application built with **LangGraph, FastAPI and Aiven PostgreSQL**, ready to deploy on Aiven Runtime. Includes an editable draft-and-review workflow, a small browser UI, and an authenticated HTTP API.

@@ -1,0 +1,19 @@
+{
+  "service_name": "prototype-agent-hub",
+  "service_type": "application",
+  "cloud": "aws-eu-west-1",
+  "plan": "startup-200-4096",
+  "tags": { "agent_hub": "true" },
+  "user_config": {
+    "application": {
+      "source": {
+        "repository_url": "https://github.com/carabaestlein/aiven-prototype-agent.git",
+        "branch": "feat/backstage-agent-hub",
+        "build_path": "./",
+        "containerfile_path": "./Dockerfile.agent-hub"
+      },
+      "ports": [{ "name": "http", "port": 7007, "protocol": "HTTP" }],
+      "environment_variables": []
+    }
+  }
+}

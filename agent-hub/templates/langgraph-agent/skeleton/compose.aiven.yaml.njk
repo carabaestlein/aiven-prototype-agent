@@ -1,0 +1,23 @@
+# Reference configuration for Runtime; supply required secrets in Runtime.
+# Select repository root build context and this agent's Dockerfile.
+services:
+  ${{ values.name }}:
+    build:
+      context: ../..
+      dockerfile: agents/${{ values.name }}/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      MODEL_MODE: ${{ values.modelMode | dump }}
+      MODEL_NAME: ${{ values.modelName | dump }}
+      MODEL_BASE_URL: ${{ values.gatewayUrl | dump }}
+      LANGFUSE_BASE_URL: ${{ values.langfuseUrl | dump }}
+      LANGFUSE_PROJECT_ID: ${{ values.langfuseProjectId | dump }}
+      TRACE_CONTENT: "false"
+      APP_ENVIRONMENT: ${{ values.environment | dump }}
+      LANGSMITH_TRACING: "false"
+      LANGCHAIN_TRACING_V2: "false"
+      # Required Runtime secrets: DATABASE_URL, PG_CA_CERT_BASE64, APP_PASSWORD,
+      # SESSION_SECRET, APP_API_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY.
+      # Also MODEL_API_KEY when MODEL_MODE=openai-compatible.
+      # DATABASE_URL must select this agent's isolated database, not defaultdb.

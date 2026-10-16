@@ -1,0 +1,149 @@
+# ${{ values.name }}
+
+${{ values.description }}
+
+This agent uses the Phase 1 LangGraph draft → human review → revise/approve
+workflow, PostgreSQL checkpoints, Aiven AI Gateway and self-hosted Langfuse.
+It is scaffolded and has **not been deployed**. The template opens a draft pull
+request in the same repository and does not create infrastructure or credentials.
+
+## Develop locally
+
+From `agents/${{ values.name }}` after the pull request is merged:
+
+```sh
+cp environment.example .env
+# Generate a DIFFERENT value for each of the four blank local secrets:
+openssl rand -hex 24
+# Set POSTGRES_PASSWORD, APP_PASSWORD, SESSION_SECRET and APP_API_KEY in .env.
+docker compose up --build
+```
+
+Open <http://localhost:8080>. Local Compose creates its own PostgreSQL container
+and volume, uses mock model responses and disables tracing until configured.
+The Dockerfile expects the **repository root** as its context; Compose already
+sets that context. Use a different host port when running several agents locally.
+
+Edit `workflow.py` to change the graph. Preserve the checkpoint thread ID and
+avoid side effects before the review `interrupt`, because that node runs again
+when resumed. Run the inherited checks from this folder:
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt -c constraints.txt
+.venv/bin/python -m pytest
+```
+
+The PostgreSQL integration checks require `TEST_DATABASE_URL` pointing at a
+dedicated test database, or `TEST_LOCAL_POSTGRES=1` with `pgserver==0.1.4`
+installed. They create and remove only their own randomly named schema.
+
+## Prepare existing services
+
+1. In Aiven project `${{ values.aivenProject }}`, reuse PostgreSQL service
+   `${{ values.postgresService }}` and create a separate database named
+   `${{ values.name | replace('-', '_') }}`. Prefer a dedicated database user with
+   access only to that database. Use its full PostgreSQL connection URI as
+   `DATABASE_URL`. **Do not reuse `defaultdb` or another agent's database.** This
+   starter uses fixed table names and sharing a database exposes other agents'
+   runs. No migration or deletion of existing databases is needed.
+2. Download the project's PostgreSQL CA certificate and base64 encode its PEM
+   contents as `PG_CA_CERT_BASE64`. Production enforces hostname verification
+   (`sslmode=verify-full`); never set `LOCAL_DEVELOPMENT=true` on Runtime.
+3. In [the existing Langfuse instance](${{ values.langfuseUrl }}), create or choose
+   the intended project and use its **Settings → API Keys** to create project
+   credentials. Confirm its ID is `${{ values.langfuseProjectId }}`; if it differs,
+   update `runtime.json` and `catalog-info.yaml`. Add `LANGFUSE_PUBLIC_KEY` and
+   `LANGFUSE_SECRET_KEY` as Runtime secrets. These are project keys, not instance
+   administration keys. No Langfuse redeploy or new storage is required.
+4. To call Aiven AI Gateway, set `MODEL_MODE=openai-compatible` and add
+   `MODEL_API_KEY` as a Runtime secret. Confirm `${{ values.modelName }}` is
+   available to that Gateway key. `mock` mode makes no model calls.
+
+This minimal template documents project/key creation in Langfuse's UI. It does
+not require organization-administration credentials in Backstage. When using a
+shared Langfuse project deliberately, runs are distinguishable by session UUID
+and `APP_ENVIRONMENT`; access to that project exposes all of its agent traces.
+
+Before deployment, verify the key pair belongs to the intended project using
+the repository helper. With `LANGFUSE_BASE_URL`, `LANGFUSE_PROJECT_ID`,
+`LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` supplied privately in your shell
+environment, run this from the agent directory:
+
+```sh
+python3 ../../agent-hub/scripts/langfuse_setup.py
+```
+
+The helper makes a read-only project API call, checks the project ID and prints
+no keys. Its optional `--write-env` destination must be outside Git and creates
+a private file without overwriting an existing one.
+
+## Deploy on Aiven Runtime
+
+Merge the pull request first. In project `${{ values.aivenProject }}`, create a
+**new** Runtime service named `${{ values.name }}` in `${{ values.cloud }}` using
+plan `${{ values.plan }}` (verify availability for the project). Set:
+
+| Setting | Value |
+| --- | --- |
+| Repository | `https://github.com/carabaestlein/aiven-prototype-agent.git` |
+| Branch | `${{ values.baseBranch }}` |
+| Build context | `./` (repository root) |
+| Dockerfile | `./agents/${{ values.name }}/Dockerfile` |
+| HTTP port | `8080` |
+| Health check | `/health/ready` |
+
+`runtime.json` is the Aiven API create-service body for
+`POST /v1/project/${{ values.aivenProject }}/service`; `compose.aiven.yaml`
+shows the equivalent build and public environment settings. They contain no
+credentials. Supply the following secrets before starting the service:
+
+| Runtime secret | Source |
+| --- | --- |
+| `DATABASE_URL` | URI for this agent's isolated database on `${{ values.postgresService }}` |
+| `PG_CA_CERT_BASE64` | Base64 PEM for that PostgreSQL project's CA |
+| `APP_PASSWORD` | New independent login secret, at least 16 characters |
+| `SESSION_SECRET` | New independent session secret, at least 32 characters |
+| `APP_API_KEY` | New independent API secret, at least 32 characters |
+| `MODEL_API_KEY` | Aiven AI Gateway key, required in real model mode |
+| `LANGFUSE_PUBLIC_KEY` | Public key for Langfuse project `${{ values.langfuseProjectId }}` |
+| `LANGFUSE_SECRET_KEY` | Matching secret key for that project |
+
+Retain the generated public variables from `runtime.json`. Set `APP_RELEASE` to
+the merged commit SHA for trace correlation. Runtime API secret entries use
+`{"key": "NAME", "value": "PRIVATE_VALUE", "kind": "secret"}`; construct
+any enriched API payload outside Git with private file permissions. Never paste
+it into Backstage parameters, task output, a pull request or a committed file.
+Prefer the Runtime secret editor if you do not already have deployment tooling.
+
+This template intentionally omits a default `application_service_credential`
+integration: the Phase 1 integration yields `defaultdb`, which would share run
+tables across agents. Use an integration only if its generated connection
+string selects this agent's isolated database. Keys and the database connection
+remain independent from the first deployed agent.
+
+After Runtime reports running, take its actual public HTTPS endpoint and check
+`/health/ready`, log in, create a synthetic run, revise it and approve it. A
+healthy container alone does not verify model calls or trace export. Check the
+same run/session UUID in [Langfuse traces](${{ values.langfuseUrl }}/project/${{ values.langfuseProjectId }}/traces).
+`TRACE_CONTENT=false` keeps request and draft bodies out of traces; enable it
+only intentionally for appropriate data. The graph and HTTP model call are
+instrumented explicitly. Langfuse export failures do not retry model execution.
+
+## Register in Agent Hub
+
+After merge, choose **Create → Register Existing Component** and enter:
+
+```text
+https://github.com/carabaestlein/aiven-prototype-agent/blob/${{ values.baseBranch }}/agents/${{ values.name }}/catalog-info.yaml
+```
+
+The generated catalog entry is `experimental` and marked `scaffolded`. After
+the deployment checks pass, add links and the `aiven.io/runtime-url` and
+`aiven.io/endpoint` annotations for the actual Runtime console service and
+application endpoint; add its readiness link and set `aiven.io/deployment-state` to
+`deployed` and choose the appropriate lifecycle. Registering source code does
+not imply that a deployment exists. Catalog registration is deferred until
+merge so it does not depend on a pull-request branch that can be deleted.
+
+See `PROVENANCE.md` for source, dependency pins and licenses.

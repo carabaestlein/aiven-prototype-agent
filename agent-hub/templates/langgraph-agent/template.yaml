@@ -1,0 +1,158 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: aiven-langgraph-agent
+  title: LangGraph agent on Aiven
+  description: Create a pull request in the Phase 1 repository with a durable draft-and-review agent, Gateway settings and self-hosted Langfuse instrumentation.
+  tags: [agent, langgraph, aiven, langfuse]
+spec:
+  owner: group:default/aiven-platform
+  type: agent
+  parameters:
+    - title: Agent
+      required: [name, owner, description]
+      properties:
+        name:
+          title: Agent name
+          type: string
+          description: A new, unique name. Code is added under agents/<name>; existing agent folders must not be reused.
+          pattern: '^[a-z][a-z0-9-]{2,39}$'
+          maxLength: 40
+          ui:autofocus: true
+        owner:
+          title: Owning team
+          type: string
+          default: group:default/aiven-platform
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+        description:
+          title: What will the agent do?
+          type: string
+          default: A durable LangGraph agent with human review.
+          minLength: 1
+          maxLength: 250
+    - title: Organization setup
+      description: These are public settings. Supply credentials in Runtime secrets after the pull request is merged, never in this form.
+      required: [repoUrl, baseBranch, aivenProject, cloud, plan, postgresService, modelMode, modelName, gatewayUrl, langfuseUrl, langfuseProjectId, environment]
+      properties:
+        repoUrl:
+          title: Organization repository
+          type: string
+          default: github.com?owner=carabaestlein&repo=aiven-prototype-agent
+          enum: ['github.com?owner=carabaestlein&repo=aiven-prototype-agent']
+          description: The same writable Phase 1 repository; no separate repository is created.
+        baseBranch:
+          title: Target branch
+          type: string
+          default: main
+          pattern: '^[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*$'
+        aivenProject:
+          title: Aiven project
+          type: string
+          default: cara-test
+          pattern: '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$'
+        cloud:
+          title: Runtime region
+          type: string
+          default: aws-eu-west-1
+          pattern: '^[a-z][a-z0-9-]+$'
+        plan:
+          title: Runtime plan
+          type: string
+          default: startup-50-1024
+          pattern: '^[a-z][a-z0-9-]+$'
+        postgresService:
+          title: Existing PostgreSQL service
+          type: string
+          default: prototype-agent-pg
+          pattern: '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$'
+          description: Reuse this service, with a separate database and credentials for each agent. Never use the first agent's defaultdb.
+        modelMode:
+          title: Model mode
+          type: string
+          default: mock
+          enum: [mock, openai-compatible]
+          enumNames: [Deterministic local demo, Aiven AI Gateway]
+        modelName:
+          title: Gateway model
+          type: string
+          default: claude-sonnet-5
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$'
+          description: An identifier enabled for your Gateway key. The default matches Phase 1; availability is verified when you run the agent.
+        gatewayUrl:
+          title: Aiven AI Gateway base URL
+          type: string
+          default: https://ai.aiven.io/v1
+          enum: [https://ai.aiven.io/v1]
+        langfuseUrl:
+          title: Self-hosted Langfuse origin
+          type: string
+          default: https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app
+          pattern: '^https://[a-zA-Z0-9.-]+(?::[0-9]{1,5})?$'
+          description: Existing Langfuse HTTPS origin, without a trailing slash or project path.
+        langfuseProjectId:
+          title: Langfuse project ID
+          type: string
+          pattern: '^[A-Za-z0-9_-]{1,200}$'
+          description: Create a project in the existing Langfuse instance and paste its ID. Its matching API keys are added privately in Runtime. Enter prototype-project only when you intentionally want to share Phase 1 traces.
+        environment:
+          title: Environment
+          type: string
+          default: development
+          enum: [development, staging, production]
+  steps:
+    - id: fetch
+      name: Generate the Phase 1 agent
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: rendered-agent
+        templateFileExtension: .njk
+        values:
+          name: ${{ parameters.name }}
+          owner: ${{ parameters.owner }}
+          description: ${{ parameters.description }}
+          repoUrl: ${{ parameters.repoUrl }}
+          baseBranch: ${{ parameters.baseBranch }}
+          aivenProject: ${{ parameters.aivenProject }}
+          cloud: ${{ parameters.cloud }}
+          plan: ${{ parameters.plan }}
+          postgresService: ${{ parameters.postgresService }}
+          modelMode: ${{ parameters.modelMode }}
+          modelName: ${{ parameters.modelName }}
+          gatewayUrl: ${{ parameters.gatewayUrl }}
+          langfuseUrl: ${{ parameters.langfuseUrl }}
+          langfuseProjectId: ${{ parameters.langfuseProjectId }}
+          environment: ${{ parameters.environment }}
+    - id: publish
+      name: Open a pull request in the existing repository
+      action: publish:github:pull-request
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        branchName: agents/${{ parameters.name }}
+        targetBranchName: ${{ parameters.baseBranch }}
+        sourcePath: rendered-agent
+        targetPath: agents/${{ parameters.name }}
+        title: 'Add agent ${{ parameters.name }}'
+        description: |
+          Adds the Phase 1 LangGraph starter under `agents/${{ parameters.name }}` with PostgreSQL checkpoints, Aiven AI Gateway configuration and self-hosted Langfuse instrumentation.
+
+          Review and merge this pull request, create an isolated database on `${{ parameters.postgresService }}`, add Runtime secrets and deploy using the generated README. Then register the merged `catalog-info.yaml` in Agent Hub. No cloud resources or credentials were created by this template.
+        update: false
+        draft: true
+  output:
+    links:
+      - title: Review the agent pull request
+        url: ${{ steps['publish'].output.remoteUrl }}
+    text:
+      - title: Next steps
+        content: |
+          The agent is scaffolded, not deployed. Review and merge the pull request, then follow `agents/${{ parameters.name }}/README.md` to create a separate database, supply secrets and deploy.
+
+          After merge, use **Create → Register Existing Component** with:
+
+          `https://github.com/carabaestlein/aiven-prototype-agent/blob/${{ parameters.baseBranch }}/agents/${{ parameters.name }}/catalog-info.yaml`
+
+          Registration is deliberately deferred until merge so the catalog does not depend on a short-lived pull-request branch. Add the verified endpoint and Runtime service URL after deployment.

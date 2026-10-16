@@ -1,0 +1,47 @@
+app:
+  baseUrl: ${HUB_BASE_URL}
+backend:
+  baseUrl: ${HUB_BASE_URL}
+  listen:
+    host: 0.0.0.0
+    port: 7007
+  cors:
+    origin: ${HUB_BASE_URL}
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  database:
+    client: pg
+    pluginDivisionMode: schema
+    connection:
+      host: ${POSTGRES_HOST}
+      port: ${POSTGRES_PORT}
+      user: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+      database: ${POSTGRES_DATABASE}
+      ssl:
+        rejectUnauthorized: true
+        ca: ${POSTGRES_CA_CERT}
+    knexConfig:
+      pool:
+        min: 0
+        max: 5
+integrations:
+  github:
+    - host: github.com
+      token: ${GITHUB_TOKEN}
+auth:
+  environment: production
+  providers:
+    github:
+      production:
+        clientId: ${AUTH_GITHUB_CLIENT_ID}
+        clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
+        signIn:
+          resolvers:
+            - resolver: userIdMatchingUserEntityAnnotation
+catalog:
+  locations:
+    - type: file
+      target: ./catalog/entities.yaml
+    - type: file
+      target: ./templates/langgraph-agent/template.yaml

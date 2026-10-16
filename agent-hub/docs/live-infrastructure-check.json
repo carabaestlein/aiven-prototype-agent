@@ -1,0 +1,115 @@
+{
+  "verified_at_utc": "2026-10-16T11:30:59.917795+00:00",
+  "read_only": true,
+  "project": "cara-test",
+  "services": [
+    {
+      "name": "prototype-agent",
+      "read_status": 200,
+      "service_type": "application",
+      "state": "RUNNING",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-50-1024",
+      "source_branch": "release/langfuse-connection",
+      "containerfile_path": "./Dockerfile",
+      "build_status": "SUCCESS",
+      "deployment_status": "COMPLETED"
+    },
+    {
+      "name": "prototype-agent-pg",
+      "read_status": 200,
+      "service_type": "pg",
+      "state": "RUNNING",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-4"
+    },
+    {
+      "name": "prototype-langfuse-web",
+      "read_status": 200,
+      "service_type": "application",
+      "state": "RUNNING",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-200-4096",
+      "source_branch": "release/step1",
+      "containerfile_path": "./Dockerfile.langfuse-web",
+      "build_status": "SUCCESS",
+      "deployment_status": "COMPLETED"
+    },
+    {
+      "name": "prototype-langfuse-worker",
+      "read_status": 200,
+      "service_type": "application",
+      "state": "RUNNING",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-200-4096",
+      "source_branch": "release/step1",
+      "containerfile_path": "./Dockerfile.langfuse-worker",
+      "build_status": "SUCCESS",
+      "deployment_status": "COMPLETED"
+    },
+    {
+      "name": "prototype-langfuse-pg",
+      "read_status": 200,
+      "service_type": "pg",
+      "state": "RUNNING",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-4"
+    },
+    {
+      "name": "prototype-langfuse-ch",
+      "read_status": 200,
+      "service_type": "clickhouse",
+      "state": "RUNNING",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-8"
+    },
+    {
+      "name": "prototype-langfuse-valkey",
+      "read_status": 200,
+      "service_type": "valkey",
+      "state": "RUNNING",
+      "cloud_name": "aws-eu-west-1",
+      "plan": "startup-2"
+    }
+  ],
+  "aiven_project_read_status": 200,
+  "organization_id": "org2a42f298289",
+  "endpoints": {
+    "agent": "https://01a143ee-18f7-7972-aebe-7cd8498afb71-8080.eur-1.aiven.app",
+    "langfuse": "https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app"
+  },
+  "agent_ready_http_status": 200,
+  "langfuse_health_http_status": 200,
+  "agent_authenticated_session_http_status": 200,
+  "agent_langfuse": {
+    "project_url": "https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app/project/prototype-project",
+    "traces_url": null,
+    "sessions_url": "https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app/project/prototype-project/sessions",
+    "capture_content": false
+  },
+  "langfuse_projects_http_status": 200,
+  "langfuse_projects": [
+    {
+      "id": "prototype-project",
+      "name": "Provisioned Project"
+    }
+  ],
+  "langfuse_observations_http_status": 200,
+  "langfuse_at_least_one_stored_observation": true,
+  "limitations": [
+    "Read-only checks did not create a new model run or restart services.",
+    "Langfuse Tracing page was verified in the signed-in browser; the Hub uses deep links and does not hold Langfuse credentials."
+  ],
+  "console_account_id": "a524d1eab5eb",
+  "console_link_verification": {
+    "method": "hrefs observed in authenticated Aiven Console by the coordinating agent",
+    "service_urls": {
+      "prototype-agent": "https://console.aiven.io/account/a524d1eab5eb/project/cara-test/services/prototype-agent/overview",
+      "prototype-agent-pg": "https://console.aiven.io/account/a524d1eab5eb/project/cara-test/services/prototype-agent-pg/overview",
+      "prototype-langfuse-web": "https://console.aiven.io/account/a524d1eab5eb/project/cara-test/services/prototype-langfuse-web/overview",
+      "prototype-langfuse-worker": "https://console.aiven.io/account/a524d1eab5eb/project/cara-test/services/prototype-langfuse-worker/overview"
+    },
+    "legacy_project_only_route": "redirected to home; replaced"
+  },
+  "langfuse_traces_ui_verified": true
+}

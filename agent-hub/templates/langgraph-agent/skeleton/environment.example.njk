@@ -1,0 +1,20 @@
+# Copy to .env for local development. Never commit the populated file.
+# Generate a DIFFERENT `openssl rand -hex 24` value for each of these:
+POSTGRES_PASSWORD=
+APP_PASSWORD=
+SESSION_SECRET=
+APP_API_KEY=
+
+# Local starts in deterministic mode, with telemetry disabled.
+# The generated runtime.json carries the selected deployment settings.
+MODEL_MODE=mock
+MODEL_NAME=${{ values.modelName }}
+MODEL_API_KEY=
+MODEL_BASE_URL=${{ values.gatewayUrl }}
+LANGFUSE_BASE_URL=
+LANGFUSE_PUBLIC_KEY=
+LANGFUSE_SECRET_KEY=
+LANGFUSE_PROJECT_ID=
+TRACE_CONTENT=false
+APP_ENVIRONMENT=development
+APP_RELEASE=

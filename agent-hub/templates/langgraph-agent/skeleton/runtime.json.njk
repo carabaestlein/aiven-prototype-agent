@@ -1,0 +1,29 @@
+{
+  "service_name": ${{ values.name | dump }},
+  "service_type": "application",
+  "plan": ${{ values.plan | dump }},
+  "cloud": ${{ values.cloud | dump }},
+  "tags": { "agent_hub": "true", "agent_name": ${{ values.name | dump }} },
+  "user_config": {
+    "application": {
+      "source": {
+        "repository_url": "https://github.com/carabaestlein/aiven-prototype-agent.git",
+        "branch": ${{ values.baseBranch | dump }},
+        "build_path": "./",
+        "containerfile_path": "./agents/${{ values.name }}/Dockerfile"
+      },
+      "ports": [{ "name": "http", "port": 8080, "protocol": "HTTP" }],
+      "environment_variables": [
+        { "key": "MODEL_MODE", "value": ${{ values.modelMode | dump }}, "kind": "variable" },
+        { "key": "MODEL_NAME", "value": ${{ values.modelName | dump }}, "kind": "variable" },
+        { "key": "MODEL_BASE_URL", "value": ${{ values.gatewayUrl | dump }}, "kind": "variable" },
+        { "key": "LANGFUSE_BASE_URL", "value": ${{ values.langfuseUrl | dump }}, "kind": "variable" },
+        { "key": "LANGFUSE_PROJECT_ID", "value": ${{ values.langfuseProjectId | dump }}, "kind": "variable" },
+        { "key": "TRACE_CONTENT", "value": "false", "kind": "variable" },
+        { "key": "APP_ENVIRONMENT", "value": ${{ values.environment | dump }}, "kind": "variable" },
+        { "key": "LANGSMITH_TRACING", "value": "false", "kind": "variable" },
+        { "key": "LANGCHAIN_TRACING_V2", "value": "false", "kind": "variable" }
+      ]
+    }
+  }
+}

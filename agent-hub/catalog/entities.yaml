@@ -1,0 +1,141 @@
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: aiven-platform
+  title: Aiven Agent Platform
+  description: Logical owner of this dogfooding platform and its approved agent starter.
+spec:
+  type: team
+  profile:
+    displayName: Aiven Agent Platform
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: carabaestlein
+  annotations:
+    github.com/user-id: '34475835'
+spec:
+  profile:
+    displayName: Cara Baestlein
+  memberOf: [aiven-platform]
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: agent-platform
+  title: Agent Platform
+  description: LangGraph agents on Aiven Runtime using AI Gateway, PostgreSQL and self-hosted Langfuse.
+spec:
+  owner: group:default/aiven-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: prototype-agent
+  title: Prototype Agent
+  description: Phase 1 LangGraph agent with saved review checkpoints, revisions, approvals and Langfuse tracing.
+  tags: [langgraph, aiven-runtime, ai-gateway, langfuse, human-review]
+  annotations:
+    backstage.io/source-location: url:https://github.com/carabaestlein/aiven-prototype-agent/tree/release/langfuse-connection
+    github.com/project-slug: carabaestlein/aiven-prototype-agent
+    aiven.io/project: cara-test
+    aiven.io/service-name: prototype-agent
+    aiven.io/runtime-url: https://console.aiven.io/account/a524d1eab5eb/project/cara-test/services/prototype-agent/overview
+    aiven.io/endpoint: https://01a143ee-18f7-7972-aebe-7cd8498afb71-8080.eur-1.aiven.app
+    langfuse.com/project-id: prototype-project
+    langfuse.com/project-url: https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app/project/prototype-project
+    langfuse.com/traces-url: https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app/project/prototype-project/traces
+    langfuse.com/sessions-url: https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app/project/prototype-project/sessions
+  links:
+    - url: https://01a143ee-18f7-7972-aebe-7cd8498afb71-8080.eur-1.aiven.app
+      title: Open agent
+      icon: dashboard
+    - url: https://console.aiven.io/account/a524d1eab5eb/project/cara-test/services/prototype-agent/overview
+      title: Aiven Runtime service
+      icon: cloud
+    - url: https://01a143ee-18f7-7972-aebe-7cd8498afb71-8080.eur-1.aiven.app/health/ready
+      title: Readiness endpoint
+      icon: web
+    - url: https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app/project/prototype-project
+      title: Langfuse project
+      icon: dashboard
+    - url: https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app/project/prototype-project/traces
+      title: Langfuse traces
+      icon: timeline
+    - url: https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app/project/prototype-project/sessions
+      title: Langfuse sessions
+      icon: timeline
+    - url: https://github.com/carabaestlein/aiven-prototype-agent/tree/release/langfuse-connection
+      title: Deployed source branch
+      icon: github
+    - url: https://github.com/carabaestlein/aiven-prototype-agent/blob/release/langfuse-connection/README.md
+      title: Agent API and usage
+      icon: docs
+spec:
+  type: agent
+  lifecycle: experimental
+  owner: group:default/aiven-platform
+  system: agent-platform
+  dependsOn:
+    - resource:default/prototype-agent-pg
+    - resource:default/aiven-ai-gateway
+    - resource:default/prototype-langfuse
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: prototype-agent-pg
+  title: Agent checkpoint PostgreSQL
+  description: Existing Aiven PostgreSQL service for the Phase 1 agent's run index and LangGraph checkpoints.
+  annotations:
+    aiven.io/project: cara-test
+    aiven.io/service-name: prototype-agent-pg
+  links:
+    - url: https://console.aiven.io/account/a524d1eab5eb/project/cara-test/services/prototype-agent-pg/overview
+      title: PostgreSQL service
+      icon: cloud
+spec:
+  type: database
+  owner: group:default/aiven-platform
+  system: agent-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: aiven-ai-gateway
+  title: Aiven AI Gateway
+  description: OpenAI-compatible model endpoint; access and model availability are controlled by the project's private Gateway key.
+  links:
+    - url: https://aiven.io/docs/products/ai-gateway/rest-api
+      title: Gateway API
+      icon: docs
+spec:
+  type: ai-gateway
+  owner: group:default/aiven-platform
+  system: agent-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: prototype-langfuse
+  title: Self-hosted Langfuse
+  description: Existing web and worker on Aiven Runtime, with dedicated PostgreSQL, ClickHouse, Valkey and private Cloudflare R2 storage.
+  annotations:
+    aiven.io/project: cara-test
+    langfuse.com/project-id: prototype-project
+  links:
+    - url: https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app/project/prototype-project
+      title: Existing Langfuse project
+      icon: dashboard
+    - url: https://console.aiven.io/account/a524d1eab5eb/project/cara-test/services/prototype-langfuse-web/overview
+      title: Langfuse web on Runtime
+      icon: cloud
+    - url: https://console.aiven.io/account/a524d1eab5eb/project/cara-test/services/prototype-langfuse-worker/overview
+      title: Langfuse worker on Runtime
+      icon: cloud
+spec:
+  type: observability-platform
+  owner: group:default/aiven-platform
+  system: agent-platform

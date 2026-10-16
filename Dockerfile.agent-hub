@@ -1,0 +1,25 @@
+# Build from the repository root so this can coexist with the Phase 1 agent.
+FROM node:24.21.0-trixie-slim AS build
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ libsqlite3-dev ca-certificates git && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY agent-hub/ ./
+RUN node .yarn/releases/yarn-4.13.0.cjs install --immutable
+RUN node .yarn/releases/yarn-4.13.0.cjs tsc
+RUN node .yarn/releases/yarn-4.13.0.cjs build:backend
+RUN mkdir -p /runtime && tar xzf packages/backend/dist/skeleton.tar.gz -C /runtime && tar xzf packages/backend/dist/bundle.tar.gz -C /runtime
+
+FROM node:24.21.0-trixie-slim AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ libsqlite3-dev ca-certificates git && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --chown=node:node --from=build /runtime/ ./
+COPY --chown=node:node agent-hub/package.json agent-hub/yarn.lock agent-hub/.yarnrc.yml agent-hub/backstage.json ./
+COPY --chown=node:node agent-hub/.yarn/ ./.yarn/
+RUN node .yarn/releases/yarn-4.13.0.cjs workspaces focus --all --production
+COPY --chown=node:node agent-hub/app-config.yaml agent-hub/app-config.production.yaml ./
+COPY --chown=node:node agent-hub/catalog/ ./catalog/
+COPY --chown=node:node agent-hub/templates/ ./templates/
+ENV NODE_ENV=production
+USER node
+EXPOSE 7007
+# Guest auth is omitted by the production backend. OAuth and PostgreSQL are required.
+CMD ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.production.yaml"]

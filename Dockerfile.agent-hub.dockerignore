@@ -1,0 +1,17 @@
+.git
+**/node_modules
+**/.yarn/cache
+**/.yarn/install-state.gz
+**/dist
+**/dist-types
+**/.env*
+**/*.local.yaml
+**/*-credentials.yaml
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/receipts
+**/*.pem
+**/playwright-report
+**/test-results
+**/.backstage-dev-db
