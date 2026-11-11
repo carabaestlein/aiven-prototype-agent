@@ -1,4 +1,4 @@
-# Aiven prototype agent — Step 1
+# Aiven prototype agent
 
 **Agent Hub:** The Backstage catalog and new-agent template are in [agent-hub/README.md](agent-hub/README.md).
 
