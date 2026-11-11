@@ -13,7 +13,7 @@ const { createFetchTemplateAction } = require('@backstage/plugin-scaffolder-back
   const templatePath = path.resolve('templates/langgraph-agent/template.yaml');
   const template = yaml.parse(await fs.readFile(templatePath, 'utf8'));
   const values = Object.assign({}, ...template.spec.parameters.map(page => Object.fromEntries(Object.entries(page.properties).filter(([, spec]) => spec.default !== undefined).map(([key, spec]) => [key, spec.default]))), {
-    name: 'smoke-agent', langfuseProjectId: 'smoke-project', description: 'A "quoted" description: safe\nnext line',
+    name: 'smoke-agent', description: 'A "quoted" description: safe\nnext line',
   });
   const ajv = new Ajv({ strict: false });
   for (const page of template.spec.parameters) assert(ajv.validate({ type: 'object', required: page.required, properties: page.properties }, values), ajv.errorsText());
@@ -31,10 +31,12 @@ const { createFetchTemplateAction } = require('@backstage/plugin-scaffolder-back
     assert.equal(catalog.metadata.name, 'smoke-agent');
     assert.equal(catalog.metadata.description, values.description);
     assert.equal(catalog.metadata.annotations['aiven.io/deployment-state'], 'scaffolded');
+    assert(!catalog.metadata.annotations['langfuse.com/project-id']);
     const runtime = JSON.parse(await fs.readFile(path.join(out, 'runtime.json'), 'utf8'));
     assert.equal(runtime.user_config.application.source.containerfile_path, './agents/smoke-agent/Dockerfile');
     assert.equal(runtime.user_config.application.source.repository_url, 'https://github.com/carabaestlein/aiven-prototype-agent.git');
     assert(!runtime.user_config.application.environment_variables.some(v => /PASSWORD|SECRET|API_KEY|DATABASE_URL/.test(v.key)));
+    assert(!runtime.user_config.application.environment_variables.some(v => v.key === 'LANGFUSE_PROJECT_ID'));
     const compose = yaml.parse(await fs.readFile(path.join(out, 'compose.yaml'), 'utf8'));
     assert(compose.services);
     for (const file of ['app.py', 'settings.py', 'service.py', 'workflow.py', 'telemetry.py', 'requirements.txt', 'constraints.txt', 'LICENSE']) {

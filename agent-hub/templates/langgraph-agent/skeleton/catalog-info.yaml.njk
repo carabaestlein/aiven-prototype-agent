@@ -9,18 +9,11 @@ metadata:
     aiven.io/service-name: ${{ values.name | dump }}
     aiven.io/deployment-state: scaffolded
     aiven.io/postgresql-service: ${{ values.postgresService | dump }}
-    langfuse.com/project-id: ${{ values.langfuseProjectId | dump }}
-    langfuse.com/project-url: ${{ values.langfuseUrl }}/project/${{ values.langfuseProjectId }}
-    langfuse.com/traces-url: ${{ values.langfuseUrl }}/project/${{ values.langfuseProjectId }}/traces
-    langfuse.com/sessions-url: ${{ values.langfuseUrl }}/project/${{ values.langfuseProjectId }}/sessions
   tags: [agent, langgraph, aiven-runtime, langfuse]
   links:
     - title: Agent source
       url: https://github.com/carabaestlein/aiven-prototype-agent/tree/${{ values.baseBranch }}/agents/${{ values.name }}
       icon: github
-    - title: Configured Langfuse traces
-      url: ${{ values.langfuseUrl }}/project/${{ values.langfuseProjectId }}/traces
-      icon: dashboard
 spec:
   type: agent
   lifecycle: experimental

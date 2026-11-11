@@ -52,8 +52,8 @@ installed. They create and remove only their own randomly named schema.
    (`sslmode=verify-full`); never set `LOCAL_DEVELOPMENT=true` on Runtime.
 3. In [the existing Langfuse instance](${{ values.langfuseUrl }}), create or choose
    the intended project and use its **Settings → API Keys** to create project
-   credentials. Confirm its ID is `${{ values.langfuseProjectId }}`; if it differs,
-   update `runtime.json` and `catalog-info.yaml`. Add `LANGFUSE_PUBLIC_KEY` and
+   credentials. Set `LANGFUSE_PROJECT_ID` to the chosen project ID in Runtime.
+   Add `LANGFUSE_PUBLIC_KEY` and
    `LANGFUSE_SECRET_KEY` as Runtime secrets. These are project keys, not instance
    administration keys. No Langfuse redeploy or new storage is required.
 4. To call Aiven AI Gateway, set `MODEL_MODE=openai-compatible` and add
@@ -106,7 +106,7 @@ credentials. Supply the following secrets before starting the service:
 | `SESSION_SECRET` | New independent session secret, at least 32 characters |
 | `APP_API_KEY` | New independent API secret, at least 32 characters |
 | `MODEL_API_KEY` | Aiven AI Gateway key, required in real model mode |
-| `LANGFUSE_PUBLIC_KEY` | Public key for Langfuse project `${{ values.langfuseProjectId }}` |
+| `LANGFUSE_PUBLIC_KEY` | Public key for the chosen Langfuse project |
 | `LANGFUSE_SECRET_KEY` | Matching secret key for that project |
 
 Retain the generated public variables from `runtime.json`. Set `APP_RELEASE` to
@@ -125,7 +125,7 @@ remain independent from the first deployed agent.
 After Runtime reports running, take its actual public HTTPS endpoint and check
 `/health/ready`, log in, create a synthetic run, revise it and approve it. A
 healthy container alone does not verify model calls or trace export. Check the
-same run/session UUID in [Langfuse traces](${{ values.langfuseUrl }}/project/${{ values.langfuseProjectId }}/traces).
+same run/session UUID using **View run in Langfuse**.
 `TRACE_CONTENT=false` keeps request and draft bodies out of traces; enable it
 only intentionally for appropriate data. The graph and HTTP model call are
 instrumented explicitly. Langfuse export failures do not retry model execution.
@@ -141,7 +141,7 @@ https://github.com/carabaestlein/aiven-prototype-agent/blob/${{ values.baseBranc
 The generated catalog entry is `experimental` and marked `scaffolded`. After
 the deployment checks pass, add links and the `aiven.io/runtime-url` and
 `aiven.io/endpoint` annotations for the actual Runtime console service and
-application endpoint; add its readiness link and set `aiven.io/deployment-state` to
+application endpoint; add its readiness link and the chosen Langfuse project links and set `aiven.io/deployment-state` to
 `deployed` and choose the appropriate lifecycle. Registering source code does
 not imply that a deployment exists. Catalog registration is deferred until
 merge so it does not depend on a pull-request branch that can be deleted.

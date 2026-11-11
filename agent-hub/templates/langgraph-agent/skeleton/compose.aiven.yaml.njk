@@ -12,7 +12,6 @@ services:
       MODEL_NAME: ${{ values.modelName | dump }}
       MODEL_BASE_URL: ${{ values.gatewayUrl | dump }}
       LANGFUSE_BASE_URL: ${{ values.langfuseUrl | dump }}
-      LANGFUSE_PROJECT_ID: ${{ values.langfuseProjectId | dump }}
       TRACE_CONTENT: "false"
       APP_ENVIRONMENT: ${{ values.environment | dump }}
       LANGSMITH_TRACING: "false"

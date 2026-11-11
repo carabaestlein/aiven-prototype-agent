@@ -22,7 +22,7 @@ registration flow.
 ## Local template testing
 
 Use Backstage's **Create → Template editor** at `/create/edit`, load this
-template directory and test with a unique sample name and nonsecret project ID.
+template directory and test with a unique sample name.
 `fetch:template` supports dry runs. The GitHub action's dry run still resolves
 its integration: when GitHub is not configured, remove the publish step in the
 editor's temporary copy and test only the fetch step. Do not click a normal

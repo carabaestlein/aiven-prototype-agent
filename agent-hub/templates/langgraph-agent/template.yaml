@@ -35,7 +35,7 @@ spec:
           maxLength: 250
     - title: Organization setup
       description: These are public settings. Supply credentials in Runtime secrets after the pull request is merged, never in this form.
-      required: [repoUrl, baseBranch, aivenProject, cloud, plan, postgresService, modelMode, modelName, gatewayUrl, langfuseUrl, langfuseProjectId, environment]
+      required: [repoUrl, baseBranch, aivenProject, cloud, plan, postgresService, modelMode, modelName, gatewayUrl, langfuseUrl, environment]
       properties:
         repoUrl:
           title: Organization repository
@@ -92,11 +92,6 @@ spec:
           default: https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app
           pattern: '^https://[a-zA-Z0-9.-]+(?::[0-9]{1,5})?$'
           description: Existing Langfuse HTTPS origin, without a trailing slash or project path.
-        langfuseProjectId:
-          title: Langfuse project ID
-          type: string
-          pattern: '^[A-Za-z0-9_-]{1,200}$'
-          description: Create a project in the existing Langfuse instance and paste its ID. Its matching API keys are added privately in Runtime. Enter prototype-project only when you intentionally want to share Phase 1 traces.
         environment:
           title: Environment
           type: string
@@ -124,7 +119,6 @@ spec:
           modelName: ${{ parameters.modelName }}
           gatewayUrl: ${{ parameters.gatewayUrl }}
           langfuseUrl: ${{ parameters.langfuseUrl }}
-          langfuseProjectId: ${{ parameters.langfuseProjectId }}
           environment: ${{ parameters.environment }}
     - id: publish
       name: Open a pull request in the existing repository
