@@ -1,0 +1,21 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: "cara-demo"
+  description: "A durable LangGraph agent with human review."
+  annotations:
+    github.com/project-slug: carabaestlein/aiven-prototype-agent
+    aiven.io/project: "cara-test"
+    aiven.io/service-name: "cara-demo"
+    aiven.io/deployment-state: scaffolded
+    aiven.io/postgresql-service: "prototype-agent-pg"
+  tags: [agent, langgraph, aiven-runtime, langfuse]
+  links:
+    - title: Agent source
+      url: https://github.com/carabaestlein/aiven-prototype-agent/tree/main/agents/cara-demo
+      icon: github
+spec:
+  type: agent
+  lifecycle: experimental
+  owner: "group:default/aiven-platform"
+  system: agent-platform
