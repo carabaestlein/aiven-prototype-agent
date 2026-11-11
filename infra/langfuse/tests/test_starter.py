@@ -78,6 +78,23 @@ class StarterTests(unittest.TestCase):
         self.assertEqual(self.env['CLICKHOUSE_MIGRATION_SSL'], 'true')
         self.assertEqual(self.env['CLICKHOUSE_CLUSTER_ENABLED'], 'false')
 
+    def test_integrated_clickhouse_credentials_drive_queries_and_migrations(self):
+        for role in ('web', 'worker'):
+            with self.subTest(role=role):
+                env = dict(self.env, AIVEN_CLICKHOUSE_USER='integrated-user',
+                           AIVEN_CLICKHOUSE_PASSWORD='new&pass+?#%')
+                prepare(env, self.root, role)
+                self.assertEqual(env['CLICKHOUSE_USER'], 'integrated-user')
+                self.assertEqual(env['CLICKHOUSE_PASSWORD'], 'new&pass+?#%')
+                query = parse_qs(urlsplit(env['STARTER_CLICKHOUSE_MIGRATION_URL']).query)
+                self.assertEqual(query['password'], ['new&pass+?#%'])
+                self.assertEqual(query['database'], ['langfuse'])
+
+    def test_incomplete_integration_does_not_mix_credentials(self):
+        self.env['AIVEN_CLICKHOUSE_USER'] = 'integrated-user'
+        with self.assertRaisesRegex(ValueError, 'AIVEN_CLICKHOUSE_PASSWORD'):
+            prepare(self.env, self.root, 'worker')
+
     def test_local_mode_explicitly_opts_out_for_local_services(self):
         self.env.update(LOCAL_DEVELOPMENT='true', NEXTAUTH_URL='http://localhost:8080', CLICKHOUSE_URL='http://clickhouse:8123')
         self.env.pop('AIVEN_CA_CERT_BASE64')

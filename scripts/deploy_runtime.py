@@ -16,7 +16,7 @@ import secrets
 import sys
 import tempfile
 import time
-from urllib.parse import unquote, urlsplit
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -33,6 +33,15 @@ DATA = {
 APPS = {'prototype-langfuse-web': ('startup-200-4096', 'Dockerfile.langfuse-web'),
         'prototype-langfuse-worker': ('startup-200-4096', 'Dockerfile.langfuse-worker'),
         'prototype-agent': ('startup-50-1024', 'Dockerfile')}
+CLICKHOUSE_INTEGRATION = {
+    'integration_type': 'application_service_credential',
+    'source_service': 'prototype-langfuse-ch',
+    'user_config': {
+        'service_type': 'clickhouse',
+        'exposed_values': {key: {'environment_variable_key': f'AIVEN_CLICKHOUSE_{key.upper()}'}
+                           for key in ('host', 'port', 'user', 'password', 'database', 'secure')},
+    },
+}
 INPUTS = ('MODEL_API_KEY', 'LANGFUSE_INIT_USER_EMAIL', 'S3_BUCKET', 'S3_REGION',
           'S3_ENDPOINT', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY')
 
@@ -262,7 +271,8 @@ class Deployer:
                     'Requested service plan is unavailable in the target region.')
         integrations = self.call('GET', f'/project/{PROJECT}/integration_types')['integration_types']
         credential = next((i for i in integrations if i.get('integration_type') == 'application_service_credential'), {})
-        require({'pg', 'valkey'} <= set(credential.get('source_service_types', [])), 'PostgreSQL/Valkey Runtime credential integrations are unavailable.')
+        require({'pg', 'valkey', 'clickhouse'} <= set(credential.get('source_service_types', [])),
+                'PostgreSQL, Valkey and ClickHouse Runtime credential integrations are required.')
         for name in (*DATA, *APPS):
             current = self.service(name, missing=True)
             if current:
@@ -277,6 +287,8 @@ class Deployer:
                     and current.get('plan') == plan, 'Existing service configuration differs from this deployment.')
             if current.get('state') == 'POWEROFF':
                 self.call('PUT', f'/project/{PROJECT}/service/{name}', {'powered': True})
+            if name in ('prototype-langfuse-web', 'prototype-langfuse-worker'):
+                self.ensure_clickhouse_integration(name)
             return current
         require(not existing_only, 'Agent-only deployment requires the existing owned agent; no service was created.')
         body = {'service_name': name, 'service_type': kind, 'plan': plan, 'cloud': CLOUD,
@@ -284,6 +296,20 @@ class Deployer:
         if integrations:
             body['service_integrations'] = integrations
         return self.call('POST', f'/project/{PROJECT}/service', body)['service']
+
+    def ensure_clickhouse_integration(self, name):
+        path = f'/project/{PROJECT}/service/{name}/integration'
+        integrations = self.call('GET', path)['integrations']
+        for integration in integrations:
+            if (integration.get('integration_type') == CLICKHOUSE_INTEGRATION['integration_type']
+                    and (integration.get('source_service') or integration.get('source_service_name'))
+                    == CLICKHOUSE_INTEGRATION['source_service']):
+                require(integration.get('active', True) and
+                        integration.get('user_config', {}).get('exposed_values')
+                        == CLICKHOUSE_INTEGRATION['user_config']['exposed_values'],
+                        'Existing ClickHouse integration is inactive or uses different variable mappings.')
+                return
+        self.call('POST', f'/project/{PROJECT}/integration', dict(CLICKHOUSE_INTEGRATION, dest_service=name))
 
     def app(self, name, values, state, existing_only=False, force_redeploy=False):
         plan, dockerfile = APPS[name]
@@ -299,6 +325,8 @@ class Deployer:
         for service, kind, variable in mappings:
             integrations.append({'integration_type': 'application_service_credential', 'source_service': service,
                 'user_config': {'service_type': kind, 'exposed_values': {'connection_string': {'environment_variable_key': variable}}}})
+        if name != 'prototype-agent':
+            integrations.append(CLICKHOUSE_INTEGRATION)
         current = self.ensure_service(name, 'application', plan, {'application': settings}, state,
                                       integrations, existing_only=existing_only)
         # Only owned fresh applications are reconciled; full env is deterministic
@@ -306,7 +334,11 @@ class Deployer:
         existing = current.get('user_config', {}).get('application', {})
         old_env = {entry.get('key'): entry.get('value') for entry in existing.get('environment_variables', [])}
         source_changed = any(existing.get('source', {}).get(key) != value for key, value in source.items())
-        if source_changed or any(old_env.get(key) != value for key, value in values.items()) or existing.get('ports') != settings['ports']:
+        legacy_clickhouse_credentials = name != 'prototype-agent' and bool(
+            {'CLICKHOUSE_USER', 'CLICKHOUSE_PASSWORD'} & old_env.keys())
+        if (source_changed or legacy_clickhouse_credentials
+                or any(old_env.get(key) != value for key, value in values.items())
+                or existing.get('ports') != settings['ports']):
             self.call('PUT', f'/project/{PROJECT}/service/{name}', {'user_config': {'application': settings}})
         if source_changed or force_redeploy:
             self.call('POST', f'/project/{PROJECT}/service/{name}/application/redeploy')
@@ -320,14 +352,9 @@ def clickhouse_settings(service):
                     and c.get('route') in ('dynamic', 'public')), None)
         require(row and row.get('host') and row.get('port'), 'ClickHouse TLS endpoints are missing; inspect service connection information.')
         return f"{scheme}://{row['host']}:{row['port']}"
-    params = service.get('service_uri_params') or {}
-    parsed = urlsplit(service.get('service_uri') or '')
-    user = params.get('user') or params.get('username') or (unquote(parsed.username) if parsed.username else None)
-    password = params.get('password') or (unquote(parsed.password) if parsed.password else None)
-    require(user and password and password not in ('***', '********', '<redacted>'), 'ClickHouse credentials are missing or redacted.')
     return {'CLICKHOUSE_URL': endpoint(('clickhouse_https',), 'https'),
             'CLICKHOUSE_MIGRATION_URL': endpoint(('clickhouse', 'clickhouse_native'), 'clickhouse'),
-            'CLICKHOUSE_USER': user, 'CLICKHOUSE_PASSWORD': password, 'CLICKHOUSE_DB': 'langfuse'}
+            'CLICKHOUSE_DB': 'langfuse'}
 
 
 def trace_content_setting(state, override=None):

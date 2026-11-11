@@ -131,15 +131,50 @@ def test_public_source_and_full_environment_keep_credentials_out_of_source():
     assert body['service_integrations'][0]['source_service'] == 'prototype-agent-pg'
 
 
-def test_clickhouse_absent_ssl_metadata_uses_tls_and_preserves_raw_password():
+@pytest.mark.parametrize('name', ['prototype-langfuse-web', 'prototype-langfuse-worker'])
+def test_new_langfuse_app_connects_clickhouse(name):
+    requests = []
+    def respond(request):
+        if request.method == 'GET':
+            return httpx.Response(404)
+        requests.append(json.loads(request.content))
+        return httpx.Response(200, json={'service': requests[-1]})
+
+    with httpx.Client(transport=httpx.MockTransport(respond)) as api:
+        deploy.Deployer(api, api).app(name, {}, state())
+    connection = next(i for i in requests[0]['service_integrations']
+                      if i['source_service'] == 'prototype-langfuse-ch')
+    assert connection['integration_type'] == 'application_service_credential'
+    assert connection['user_config']['exposed_values']['password'] == {
+        'environment_variable_key': 'AIVEN_CLICKHOUSE_PASSWORD'}
+
+
+def test_clickhouse_integration_is_added_once_to_existing_application():
+    links = []
+    name = 'prototype-langfuse-web'
+    def respond(request):
+        if request.method == 'GET':
+            return httpx.Response(200, json={'integrations': links})
+        assert request.url.path.endswith('/integration')
+        links.append(json.loads(request.content))
+        return httpx.Response(200, json={})
+
+    with httpx.Client(transport=httpx.MockTransport(respond)) as api:
+        runner = deploy.Deployer(api, api)
+        runner.ensure_clickhouse_integration(name)
+        runner.ensure_clickhouse_integration(name)
+    assert len(links) == 1
+    assert links[0]['dest_service'] == name
+
+
+def test_clickhouse_endpoints_use_tls_without_copying_credentials():
     service = {'components': [{'component': name, 'host': 'db.example.test', 'port': port, 'route': 'dynamic'}
                               for name, port in [('clickhouse_https', 12345), ('clickhouse', 12346)]],
                'service_uri_params': {'user': 'raw%40user', 'password': 'raw%2Fpassword'}}
     values = deploy.clickhouse_settings(service)
     assert values['CLICKHOUSE_URL'] == 'https://db.example.test:12345'
     assert values['CLICKHOUSE_MIGRATION_URL'] == 'clickhouse://db.example.test:12346'
-    assert values['CLICKHOUSE_USER'] == 'raw%40user'
-    assert values['CLICKHOUSE_PASSWORD'] == 'raw%2Fpassword'
+    assert set(values) == {'CLICKHOUSE_URL', 'CLICKHOUSE_MIGRATION_URL', 'CLICKHOUSE_DB'}
     service['components'][0]['ssl'] = False
     with pytest.raises(deploy.DeploymentError, match='TLS endpoints'):
         deploy.clickhouse_settings(service)
@@ -188,7 +223,7 @@ def test_full_flow_waits_for_web_before_worker_and_shares_stable_configuration(t
     assert events.index(('health', 'https://langfuse.example.test/api/public/health')) < events.index(('app', 'prototype-langfuse-worker'))
     assert events.index(('initialized', 'https://langfuse.example.test')) < events.index(('app', 'prototype-langfuse-worker'))
     assert events.index(('ready', ('prototype-langfuse-worker',))) < events.index(('app', 'prototype-agent'))
-    for key in ('SALT', 'ENCRYPTION_KEY', 'S3_SECRET_ACCESS_KEY', 'NEXTAUTH_URL', 'CLICKHOUSE_PASSWORD'):
+    for key in ('SALT', 'ENCRYPTION_KEY', 'S3_SECRET_ACCESS_KEY', 'NEXTAUTH_URL', 'CLICKHOUSE_URL', 'CLICKHOUSE_MIGRATION_URL', 'CLICKHOUSE_DB'):
         assert apps['prototype-langfuse-web'][key] == apps['prototype-langfuse-worker'][key]
     assert apps['prototype-agent']['LANGFUSE_SECRET_KEY'] == private['values']['LANGFUSE_INIT_PROJECT_SECRET_KEY']
     assert apps['prototype-agent']['APP_API_KEY'] == private['values']['APP_API_KEY']

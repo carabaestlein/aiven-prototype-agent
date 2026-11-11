@@ -111,6 +111,11 @@ def prepare(env, directory, role):
     if (migration.scheme != "clickhouse" or not migration.port or migration.username or migration.password
             or migration.path not in ("", "/") or migration.query):
         raise ValueError("CLICKHOUSE_MIGRATION_URL must be clickhouse://HOST:PORT without credentials or query")
+    # Keep the existing protocol-specific URLs and database. Runtime injects the
+    # credentials separately; local Compose still supplies Langfuse's variables.
+    if "AIVEN_CLICKHOUSE_USER" in env or "AIVEN_CLICKHOUSE_PASSWORD" in env:
+        env["CLICKHOUSE_USER"] = required(env, "AIVEN_CLICKHOUSE_USER")
+        env["CLICKHOUSE_PASSWORD"] = required(env, "AIVEN_CLICKHOUSE_PASSWORD")
     user = required(env, "CLICKHOUSE_USER")
     password = required(env, "CLICKHOUSE_PASSWORD")
     database = required(env, "CLICKHOUSE_DB")

@@ -70,7 +70,7 @@ No lifecycle deletion rule is applied automatically. Raw events accumulate; choo
 
 `compose.aiven.yaml` describes both builds plus the PostgreSQL/Valkey dependencies recognized by Runtime's scanner. **ClickHouse and object storage are not scanner-provisioned dependencies.** Review detected resources to avoid creating duplicate PostgreSQL/Valkey services for the worker. If using Console's scanner, deploy web first and worker after migrations, attaching the same existing services.
 
-For MCP/API deployment, Compose is not processed. Set `source.build_path="./"` for both apps; set `source.containerfile_path="./Dockerfile"` for web and `"./Dockerfile.worker"` for worker. Create the two credential integrations explicitly for each app. Web has `ports=[{"name":"default","port":8080,"protocol":"HTTP"}]`; worker has `ports=[]`. Runtime applications do not need an application-to-application integration: ingestion coordination uses the shared data services.
+For MCP/API deployment, Compose is not processed. Set `source.build_path="./"` for both apps; set `source.containerfile_path="./Dockerfile"` for web and `"./Dockerfile.worker"` for worker. Create the PostgreSQL, Valkey and ClickHouse credential integrations explicitly for each app. Web has `ports=[{"name":"default","port":8080,"protocol":"HTTP"}]`; worker has `ports=[]`. Runtime applications do not need an application-to-application integration: ingestion coordination uses the shared data services.
 
 ### Shared settings — web and worker
 
@@ -86,7 +86,7 @@ Use [.env.runtime.example](.env.runtime.example) as a reference, not a file to c
 | `NEXTAUTH_URL` | Generated **web** HTTPS origin, no path |
 | `CLICKHOUSE_URL` | Aiven's HTTPS interface origin, including its actual port |
 | `CLICKHOUSE_MIGRATION_URL` | `clickhouse://HOST:NATIVE_TLS_PORT`, no credentials/path/query |
-| `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD` | Credentials for the pre-created ClickHouse database |
+| `AIVEN_CLICKHOUSE_USER`, `AIVEN_CLICKHOUSE_PASSWORD` | Supplied by the Runtime ClickHouse credential integration. Use the `AIVEN_CLICKHOUSE_` prefix for all six integration variables. Keep the HTTPS/native URLs and database above; local Compose uses `CLICKHOUSE_USER` and `CLICKHOUSE_PASSWORD`. |
 | `CLICKHOUSE_DB` | `langfuse` |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT` | Private bucket and provider settings; R2 region is `auto` |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Bucket-scoped S3 credentials |
