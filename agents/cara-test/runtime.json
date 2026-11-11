@@ -1,0 +1,28 @@
+{
+  "service_name": "cara-test",
+  "service_type": "application",
+  "plan": "startup-50-1024",
+  "cloud": "aws-eu-west-1",
+  "tags": { "agent_hub": "true", "agent_name": "cara-test" },
+  "user_config": {
+    "application": {
+      "source": {
+        "repository_url": "https://github.com/carabaestlein/aiven-prototype-agent.git",
+        "branch": "main",
+        "build_path": "./",
+        "containerfile_path": "./agents/cara-test/Dockerfile"
+      },
+      "ports": [{ "name": "http", "port": 8080, "protocol": "HTTP" }],
+      "environment_variables": [
+        { "key": "MODEL_MODE", "value": "mock", "kind": "variable" },
+        { "key": "MODEL_NAME", "value": "claude-sonnet-5", "kind": "variable" },
+        { "key": "MODEL_BASE_URL", "value": "https://ai.aiven.io/v1", "kind": "variable" },
+        { "key": "LANGFUSE_BASE_URL", "value": "https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app", "kind": "variable" },
+        { "key": "TRACE_CONTENT", "value": "false", "kind": "variable" },
+        { "key": "APP_ENVIRONMENT", "value": "development", "kind": "variable" },
+        { "key": "LANGSMITH_TRACING", "value": "false", "kind": "variable" },
+        { "key": "LANGCHAIN_TRACING_V2", "value": "false", "kind": "variable" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,22 @@
+# Reference configuration for Runtime; supply required secrets in Runtime.
+# Select repository root build context and this agent's Dockerfile.
+services:
+  cara-test:
+    build:
+      context: ../..
+      dockerfile: agents/cara-test/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      MODEL_MODE: "mock"
+      MODEL_NAME: "claude-sonnet-5"
+      MODEL_BASE_URL: "https://ai.aiven.io/v1"
+      LANGFUSE_BASE_URL: "https://01a143e8-a09e-70b1-9170-21575e8e407f-8080.eur-1.aiven.app"
+      TRACE_CONTENT: "false"
+      APP_ENVIRONMENT: "development"
+      LANGSMITH_TRACING: "false"
+      LANGCHAIN_TRACING_V2: "false"
+      # Required Runtime secrets: DATABASE_URL, PG_CA_CERT_BASE64, APP_PASSWORD,
+      # SESSION_SECRET, APP_API_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY.
+      # Also MODEL_API_KEY when MODEL_MODE=openai-compatible.
+      # DATABASE_URL must select this agent's isolated database, not defaultdb.
